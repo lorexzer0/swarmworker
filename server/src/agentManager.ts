@@ -8,7 +8,7 @@ import * as pty from '@homebridge/node-pty-prebuilt-multiarch';
 import type { IPty } from '@homebridge/node-pty-prebuilt-multiarch';
 
 import { resolveClaudeLauncher, sanitizedEnv, ensureTrusted } from './claudeConfig.js';
-import { TranscriptWatcher, emptyUsage, transcriptExists } from './tokens.js';
+import { TranscriptWatcher, emptyUsage, transcriptExists, mostRecentSession } from './tokens.js';
 import {
   isGitRepo,
   repoToplevel,
@@ -17,6 +17,7 @@ import {
   removeWorktree,
   deleteBranchRef,
   generateBranch,
+  toSnakeCase,
 } from './worktrees.js';
 import type { Store } from './store.js';
 import type { AgentMeta, PermissionMode, Project } from './types.js';
@@ -40,6 +41,8 @@ export interface SpawnOptions {
   mode?: PermissionMode;
   name?: string;
   initialPrompt?: string;
+  /** Run directly in the repo's main checkout (no worktree, no new branch). */
+  inPlace?: boolean;
 }
 
 export class AgentManager extends EventEmitter {
@@ -50,7 +53,7 @@ export class AgentManager extends EventEmitter {
     // Reload prior agents as "exited" so they can be resumed after a restart.
     for (const meta of store.state.agents) {
       this.agents.set(meta.id, {
-        meta: { ...meta, status: 'exited' },
+        meta: { ...meta, inPlace: meta.inPlace ?? false, status: 'exited' },
         ring: [],
         ringBytes: 0,
       });
@@ -98,17 +101,32 @@ export class AgentManager extends EventEmitter {
       throw new Error(`${project.path} is not a git repository`);
     }
     const repo = await repoToplevel(project.path);
-    const base = opts.base || project.defaultBranch || (await currentBranch(repo));
-
     const id = randomUUID().slice(0, 8);
-    const branch = opts.branch?.trim() || generateBranch(base, id);
-    const { worktreePath } = await addWorktree(
-      repo,
-      this.store.state.settings.worktreeRoot,
-      project.id,
-      branch,
-      base,
-    );
+
+    let worktreePath: string;
+    let branch: string;
+    let base: string;
+    if (opts.inPlace) {
+      // Work directly in the repo's main checkout: no worktree, no new branch.
+      // We stay on whatever branch the repo is currently on.
+      base = await currentBranch(repo);
+      branch = base;
+      worktreePath = repo;
+      const existing = this.findLiveByWorktree(worktreePath);
+      if (existing?.proc) {
+        throw new Error('an agent is already running in this repo checkout; open or stop it first');
+      }
+    } else {
+      base = opts.base || project.defaultBranch || (await currentBranch(repo));
+      branch = opts.branch?.trim() || generateBranch(base, id);
+      ({ worktreePath } = await addWorktree(
+        repo,
+        this.store.state.settings.worktreeRoot,
+        project.id,
+        branch,
+        base,
+      ));
+    }
 
     ensureTrusted(worktreePath);
 
@@ -126,6 +144,7 @@ export class AgentManager extends EventEmitter {
       branch,
       baseBranch: base,
       worktreePath,
+      inPlace: !!opts.inPlace,
       sessionId,
       model,
       mode,
@@ -141,14 +160,23 @@ export class AgentManager extends EventEmitter {
     const live: LiveAgent = { meta, ring: [], ringBytes: 0 };
     this.agents.set(id, live);
 
-    this.startProcess(live, ['--session-id', sessionId], opts.initialPrompt);
+    this.startProcess(live, ['--session-id', sessionId], {
+      renameTo: toSnakeCase(meta.name),
+      initialPrompt: opts.initialPrompt,
+    });
     this.syncStore();
     this.emit('update', meta);
     return meta;
   }
 
-  /** (Re)launch the claude process for an existing live-agent record. */
-  private startProcess(live: LiveAgent, sessionArgs: string[], initialPrompt?: string): void {
+  /** (Re)launch the claude process for an existing live-agent record.
+   *  `seed.renameTo` names the conversation (sent as `/rename` before anything
+   *  else); `seed.initialPrompt` is the first message — typed after the rename. */
+  private startProcess(
+    live: LiveAgent,
+    sessionArgs: string[],
+    seed?: { renameTo?: string; initialPrompt?: string },
+  ): void {
     const { meta } = live;
     const launcher = resolveClaudeLauncher();
     const args = [
@@ -196,12 +224,30 @@ export class AgentManager extends EventEmitter {
     watcher.start();
     live.watcher = watcher;
 
-    if (initialPrompt) {
-      setTimeout(() => {
-        proc.write(initialPrompt);
-        setTimeout(() => proc.write('\r'), 400);
-      }, 3500);
-    }
+    // Drive the TUI once it's up: name the conversation first, then send the
+    // initial prompt. Each line is typed, then submitted ~400ms later; the next
+    // line starts ~900ms after that so the TUI settles between them.
+    let at = 3500;
+    const sendLine = (text: string) => {
+      const a = at;
+      setTimeout(() => proc.write(text), a);
+      setTimeout(() => proc.write('\r'), a + 400);
+      at += 1300;
+    };
+    if (seed?.renameTo) sendLine(`/rename ${seed.renameTo}`);
+    if (seed?.initialPrompt) sendLine(seed.initialPrompt);
+  }
+
+  /** Reset a live record's replay/usage and (re)start its process. */
+  private relaunch(
+    live: LiveAgent,
+    sessionArgs: string[],
+    seed?: { renameTo?: string; initialPrompt?: string },
+  ): void {
+    live.ring = [];
+    live.ringBytes = 0;
+    live.meta.usage = emptyUsage();
+    this.startProcess(live, sessionArgs, seed);
   }
 
   input(id: string, data: string): void {
@@ -247,20 +293,17 @@ export class AgentManager extends EventEmitter {
     if (!live) throw new Error(`unknown agent ${id}`);
     if (live.proc) return live.meta; // already running
     ensureTrusted(live.meta.worktreePath);
-    live.ring = [];
-    live.ringBytes = 0;
-    live.meta.usage = emptyUsage();
     // Resume the prior conversation if Claude saved one; otherwise the old
     // session had no transcript (e.g. stopped at idle) — start fresh in the
     // same worktree rather than failing with "No conversation found".
-    let sessionArgs: string[];
     if (transcriptExists(live.meta.worktreePath, live.meta.sessionId)) {
-      sessionArgs = ['--resume', live.meta.sessionId];
+      this.relaunch(live, ['--resume', live.meta.sessionId]);
     } else {
       live.meta.sessionId = randomUUID();
-      sessionArgs = ['--session-id', live.meta.sessionId];
+      this.relaunch(live, ['--session-id', live.meta.sessionId], {
+        renameTo: toSnakeCase(live.meta.name),
+      });
     }
-    this.startProcess(live, sessionArgs);
     this.emit('update', live.meta);
     return live.meta;
   }
@@ -279,18 +322,43 @@ export class AgentManager extends EventEmitter {
   }
 
   /**
-   * "Continue working" on an existing worktree: if an agent is already bound,
-   * focus it (running) or resume it (stopped); otherwise adopt the worktree
-   * with a fresh agent — WITHOUT creating a new worktree.
+   * "Continue working" on an existing worktree. Re-entering a worktree almost
+   * always means picking up a prior conversation, so by default we resume the
+   * requested discussion (`sessionId`), or the most recent one if none is given.
+   * Pass `fresh` to start a brand-new conversation instead. If an agent is
+   * already bound to the worktree we reuse that record. No new worktree is made.
    */
   async openWorktree(opts: {
     projectId: string;
     worktreePath: string;
     branch: string | null;
+    sessionId?: string;
+    fresh?: boolean;
   }): Promise<AgentMeta> {
-    const existing = this.findLiveByWorktree(opts.worktreePath);
+    const worktreePath = path.normalize(opts.worktreePath);
+
+    const existing = this.findLiveByWorktree(worktreePath);
     if (existing) {
-      return existing.proc ? existing.meta : this.resume(existing.meta.id);
+      if (existing.proc) {
+        // Can't hot-swap a live PTY onto another conversation.
+        if (opts.sessionId && existing.meta.sessionId !== opts.sessionId) {
+          throw new Error('an agent is already running here; stop it before switching discussions');
+        }
+        return existing.meta;
+      }
+      if (opts.fresh) {
+        ensureTrusted(existing.meta.worktreePath);
+        existing.meta.sessionId = randomUUID();
+        this.relaunch(existing, ['--session-id', existing.meta.sessionId], {
+          renameTo: toSnakeCase(existing.meta.name),
+        });
+        this.emit('update', existing.meta);
+        return existing.meta;
+      }
+      // Default / explicit pick: resume a conversation. An explicit sessionId
+      // repoints the agent; otherwise resume() continues its own last session.
+      if (opts.sessionId) existing.meta.sessionId = opts.sessionId;
+      return this.resume(existing.meta.id);
     }
 
     const cap = this.store.state.settings.concurrencyCap;
@@ -299,11 +367,14 @@ export class AgentManager extends EventEmitter {
     }
     const project = this.project(opts.projectId);
     const repo = await repoToplevel(project.path);
-    const worktreePath = path.normalize(opts.worktreePath);
+    const inPlace = worktreePath === path.normalize(repo);
     ensureTrusted(worktreePath);
 
+    // Re-entering an unbound worktree → continue a prior conversation by default
+    // (explicit pick, else most recent); `fresh` forces a new one.
+    const target = opts.fresh ? undefined : opts.sessionId || mostRecentSession(worktreePath);
     const id = randomUUID().slice(0, 8);
-    const sessionId = randomUUID();
+    const sessionId = target || randomUUID();
     const meta: AgentMeta = {
       id,
       projectId: project.id,
@@ -312,6 +383,7 @@ export class AgentManager extends EventEmitter {
       branch: opts.branch || 'detached',
       baseBranch: project.defaultBranch,
       worktreePath,
+      inPlace,
       sessionId,
       model: this.store.state.settings.defaultModel,
       mode: this.store.state.settings.defaultMode,
@@ -325,7 +397,11 @@ export class AgentManager extends EventEmitter {
     };
     const live: LiveAgent = { meta, ring: [], ringBytes: 0 };
     this.agents.set(id, live);
-    this.startProcess(live, ['--session-id', sessionId]);
+    if (target) {
+      this.startProcess(live, ['--resume', target]);
+    } else {
+      this.startProcess(live, ['--session-id', sessionId], { renameTo: toSnakeCase(meta.name) });
+    }
     this.syncStore();
     this.emit('update', meta);
     return meta;
@@ -366,7 +442,9 @@ export class AgentManager extends EventEmitter {
     const live = this.agents.get(id);
     if (!live) return;
     await this.stop(id);
-    if (deleteWorktree) {
+    // Never delete the repo's main checkout — an in-place agent has no worktree
+    // of its own to remove.
+    if (deleteWorktree && !live.meta.inPlace) {
       try {
         await removeWorktree(live.meta.repoPath, live.meta.worktreePath);
       } catch (e) {

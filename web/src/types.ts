@@ -42,6 +42,7 @@ export interface AgentMeta {
   branch: string;
   baseBranch: string;
   worktreePath: string;
+  inPlace: boolean;
   sessionId: string;
   model: string;
   mode: PermissionMode;
@@ -73,5 +74,15 @@ export interface WorktreeRow {
   prunable: boolean;
   dirtyFiles: number;
   commitsAhead: number;
+  discussions: number; // count of prior Claude conversations for this cwd
   agent: { id: string; status: AgentStatus; model: string; mode: PermissionMode; name: string } | null;
+}
+
+/** A prior Claude conversation recorded for a worktree. */
+export interface Discussion {
+  sessionId: string;
+  title: string | null;
+  preview: string | null;
+  updatedAt: number;
+  sizeBytes: number;
 }

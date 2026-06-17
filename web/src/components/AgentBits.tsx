@@ -43,7 +43,10 @@ export function AgentActions({ agent, compact }: { agent: AgentMeta; compact?: b
   const running = agent.status === 'running' || agent.status === 'starting';
 
   const onRemove = () => {
-    if (confirm(`Remove "${agent.name}" from the list?\n\nIts git worktree and branch are kept on disk at:\n${agent.worktreePath}`)) {
+    const detail = agent.inPlace
+      ? `\n\nThis agent runs directly in the repo checkout — nothing on disk is touched:\n${agent.worktreePath}`
+      : `\n\nIts git worktree and branch are kept on disk at:\n${agent.worktreePath}`;
+    if (confirm(`Remove "${agent.name}" from the list?${detail}`)) {
       deleteAgent(agent.id, false).catch((e) => alert(e.message));
     }
   };

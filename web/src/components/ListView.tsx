@@ -53,7 +53,14 @@ export function ListView({ onNew }: { onNew: () => void }) {
                 </td>
                 <td>{a.name}</td>
                 <td>{a.projectName}</td>
-                <td className="mono small">{a.branch}</td>
+                <td className="mono small">
+                  {a.branch}
+                  {a.inPlace && (
+                    <span className="chip" style={{ marginLeft: 6 }} title="runs in the repo's main checkout, no worktree">
+                      in place
+                    </span>
+                  )}
+                </td>
                 <td className="small">{a.model}</td>
                 <td>
                   <ModeChip agent={a} />

@@ -39,6 +39,13 @@ Then: **+ New agent** → paste a git repo path → **+ add** → pick a base br
 spawn. Worktrees are created automatically; you never touch the repo's main
 checkout.
 
+**Working in place (no worktree).** Sometimes you want an agent to operate
+directly on the repo's main checkout rather than an isolated worktree. Tick
+**Work in the repo directly (no worktree)** in the New-agent dialog (or hit
+*start agent* on the **repo root** row in the Worktrees manager). The agent runs
+in the repo's current working dir on its current branch — no worktree or branch
+is created, and removing the agent never deletes that checkout.
+
 ## How it works
 
 ```
@@ -82,6 +89,19 @@ Key implementation notes:
 State (registered projects, settings, agent metadata) is persisted to
 `~/.swarmworker/state.json`. Stopped agents can be **resumed** (`--resume`).
 
+### Named conversations & discussions
+
+- **Auto-named conversations.** When an agent is *opened* (new agent, or a fresh
+  conversation in a worktree), swarmworker drives the TUI with
+  `/rename <window_name_in_snake_case>` *before* sending the initial prompt, so
+  every conversation has a stable, recognizable title on disk.
+- **Re-entering a worktree continues a discussion.** Each worktree row in the
+  Worktrees manager shows a **💬 count** of prior Claude conversations
+  ("discussions"). Opening a worktree resumes the most recent discussion by
+  default; expand the 💬 chip to pick a specific one, or hit **＋ new** to start
+  a fresh conversation. Discussions are read from the on-disk session
+  transcripts (`custom-title` for the name, file mtime for recency).
+
 ## Layout
 
 ```
@@ -90,4 +110,6 @@ web/      React + Vite + xterm.js SPA (list view, camera grid, dialogs)
 ```
 
 `server/src/smoke.ts` is a standalone integration check (`npm -w server run smoke`)
-that spawns one claude PTY and confirms token tailing.
+that spawns one claude PTY and confirms token tailing. `smoke-rename.ts`
+(`npm -w server run smoke:rename`) confirms the auto-`/rename` lands a
+`custom-title` in the transcript.

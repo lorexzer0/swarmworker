@@ -18,6 +18,11 @@ export function fmtAge(ms: number): string {
   return `${Math.floor(h / 24)}d ${h % 24}h`;
 }
 
+/** "3m 20s ago" style relative time from an absolute ms timestamp. */
+export function fmtAgo(ts: number): string {
+  return `${fmtAge(Date.now() - ts)} ago`;
+}
+
 export const STATUS_COLOR: Record<AgentStatus, string> = {
   starting: '#e6b450',
   running: '#7fd962',

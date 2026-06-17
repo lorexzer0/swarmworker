@@ -14,6 +14,7 @@ export function SpawnDialog({ onClose }: { onClose: () => void }) {
   const [mode, setMode] = useState<PermissionMode>(settings?.defaultMode || 'auto');
   const [name, setName] = useState('');
   const [prompt, setPrompt] = useState('');
+  const [inPlace, setInPlace] = useState(false);
   const [newPath, setNewPath] = useState('');
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState(false);
@@ -65,6 +66,7 @@ export function SpawnDialog({ onClose }: { onClose: () => void }) {
         mode,
         name: name.trim() || undefined,
         initialPrompt: prompt.trim() || undefined,
+        inPlace,
       });
       onClose();
     } catch (e: any) {
@@ -105,24 +107,34 @@ export function SpawnDialog({ onClose }: { onClose: () => void }) {
           </div>
         </label>
 
-        <div className="grid2">
-          <label>
-            <span>Base branch (worktree forks from here)</span>
-            <select value={base} onChange={(e) => setBase(e.target.value)}>
-              {branches.length === 0 && <option value="">{base || '—'}</option>}
-              {base && !branches.includes(base) && <option value={base}>{base} (not found)</option>}
-              {branches.map((b) => (
-                <option key={b} value={b}>
-                  {b}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
-            <span>New branch name (blank = auto)</span>
-            <input placeholder={`swarm/${base || 'base'}-xxxxxxxx`} value={branch} onChange={(e) => setBranch(e.target.value)} />
-          </label>
-        </div>
+        <label className="checkbox-row">
+          <input type="checkbox" checked={inPlace} onChange={(e) => setInPlace(e.target.checked)} />
+          <span>
+            Work in the repo directly (no worktree)
+            <span className="muted small"> — runs on the repo's current branch; no separate worktree or branch is created.</span>
+          </span>
+        </label>
+
+        {!inPlace && (
+          <div className="grid2">
+            <label>
+              <span>Base branch (worktree forks from here)</span>
+              <select value={base} onChange={(e) => setBase(e.target.value)}>
+                {branches.length === 0 && <option value="">{base || '—'}</option>}
+                {base && !branches.includes(base) && <option value={base}>{base} (not found)</option>}
+                {branches.map((b) => (
+                  <option key={b} value={b}>
+                    {b}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              <span>New branch name (blank = auto)</span>
+              <input placeholder={`swarm/${base || 'base'}-xxxxxxxx`} value={branch} onChange={(e) => setBranch(e.target.value)} />
+            </label>
+          </div>
+        )}
 
         <div className="grid2">
           <label>

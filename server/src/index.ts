@@ -18,6 +18,7 @@ import {
   listProjectWorktrees,
   worktreeDiffStat,
 } from './worktrees.js';
+import { countSessions, listSessions } from './tokens.js';
 import type { Project } from './types.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -101,6 +102,7 @@ app.post('/api/agents', async (req, res) => {
       mode: req.body?.mode,
       name: req.body?.name,
       initialPrompt: req.body?.initialPrompt,
+      inPlace: !!req.body?.inPlace,
     });
     res.json(meta);
   } catch (e: any) {
@@ -148,6 +150,7 @@ app.get('/api/worktrees', async (_req, res) => {
           projectId: project.id,
           projectName: project.name,
           ...w,
+          discussions: countSessions(w.path),
           agent: agent
             ? { id: agent.id, status: agent.status, model: agent.model, mode: agent.mode, name: agent.name }
             : null,
@@ -160,12 +163,21 @@ app.get('/api/worktrees', async (_req, res) => {
   res.json({ worktrees: out });
 });
 
+// Discussions (prior Claude conversations) recorded for a worktree's cwd.
+app.get('/api/worktrees/discussions', (req, res) => {
+  const p = String(req.query.path || '');
+  if (!p) return res.status(400).json({ error: 'path required' });
+  res.json({ discussions: listSessions(p) });
+});
+
 app.post('/api/worktrees/open', async (req, res) => {
   try {
     const meta = await manager.openWorktree({
       projectId: String(req.body?.projectId),
       worktreePath: String(req.body?.worktreePath),
       branch: req.body?.branch ?? null,
+      sessionId: req.body?.sessionId || undefined,
+      fresh: !!req.body?.fresh,
     });
     res.json(meta);
   } catch (e: any) {

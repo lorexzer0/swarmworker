@@ -71,6 +71,11 @@ export function sanitizeBranchSegment(s: string): string {
   return s.replace(/[^a-zA-Z0-9._-]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
 }
 
+/** lower_snake_case form of a name, for use as a Claude session name (/rename). */
+export function toSnakeCase(s: string): string {
+  return s.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '') || 'session';
+}
+
 /** Generate a unique-ish branch name like `swarm/<base>-<id>`. */
 export function generateBranch(base: string, idSuffix: string): string {
   const b = sanitizeBranchSegment(base) || 'work';

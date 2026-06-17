@@ -36,6 +36,7 @@ export interface AgentMeta {
   branch: string;
   baseBranch: string;
   worktreePath: string;
+  inPlace: boolean; // true = running in the repo's main checkout, no worktree
   sessionId: string;
   model: string;
   mode: PermissionMode;

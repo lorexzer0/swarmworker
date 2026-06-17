@@ -168,6 +168,9 @@ table.agents tbody tr.sel { background: #142233; }
 .form label { display: flex; flex-direction: column; gap: 4px; }
 .form label > span { color: var(--muted); font-size: 11px; }
 .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.form label.checkbox-row { flex-direction: row; align-items: flex-start; gap: 8px; cursor: pointer; }
+.form label.checkbox-row > input { flex: 0 0 auto; margin-top: 2px; }
+.form label.checkbox-row > span { color: var(--text); font-size: 12px; }
 .row { display: flex; gap: 8px; }
 .row > input, .row > select { flex: 1; }
 input, select, textarea {
@@ -191,7 +194,7 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--a
 .wt-group { margin-bottom: 14px; }
 .wt-group-head { font-weight: 600; color: var(--accent); font-size: 12px; margin: 4px 0 6px; }
 .wt-row {
-  display: flex; align-items: center; gap: 12px; padding: 8px 10px;
+  display: flex; align-items: center; flex-wrap: wrap; gap: 12px; padding: 8px 10px;
   background: var(--panel-2); border: 1px solid var(--line); border-radius: 6px; margin-bottom: 6px;
 }
 .wt-row.main { opacity: 0.8; }
@@ -202,6 +205,21 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--a
 .wt-agent { display: inline-flex; align-items: center; gap: 5px; }
 .wt-dirty { color: var(--accent); }
 .wt-actions { display: flex; gap: 6px; flex: 0 0 auto; }
+.wt-disc-toggle {
+  background: transparent; color: var(--accent-2); border: 1px solid var(--line);
+  border-radius: 10px; padding: 1px 7px; font-size: 11px; cursor: pointer;
+}
+.wt-disc-toggle:hover { border-color: var(--accent-2); }
+.wt-discussions { flex: 0 0 100%; display: flex; flex-direction: column; gap: 4px; margin-top: 2px; padding-left: 4px; }
+.wt-disc {
+  display: flex; align-items: baseline; gap: 10px; text-align: left; width: 100%;
+  background: var(--panel); color: var(--text); border: 1px solid var(--line);
+  border-radius: 6px; padding: 5px 9px; cursor: pointer; font-size: 12px;
+}
+.wt-disc:hover:not(:disabled) { border-color: var(--accent-2); }
+.wt-disc:disabled { cursor: default; opacity: 0.6; }
+.wt-disc-title { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.wt-disc-meta { flex: 0 0 auto; font-size: 11px; }
 
 /* ---- empty ---- */
 .empty { height: 100%; display: grid; place-content: center; justify-items: center; gap: 8px; color: var(--muted); text-align: center; }

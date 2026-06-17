@@ -1,5 +1,5 @@
 import { api } from './api';
-import type { AgentMeta, Project, Settings, WorktreeRow } from './types';
+import type { AgentMeta, Discussion, Project, Settings, WorktreeRow } from './types';
 
 export const spawnAgent = (body: Record<string, unknown>) =>
   api<AgentMeta>('/agents', { method: 'POST', body: JSON.stringify(body) });
@@ -26,8 +26,16 @@ export const patchSettings = (body: Partial<Settings>) =>
 
 export const listWorktrees = () => api<{ worktrees: WorktreeRow[] }>('/worktrees');
 
-export const openWorktree = (body: { projectId: string; worktreePath: string; branch: string | null }) =>
-  api<AgentMeta>('/worktrees/open', { method: 'POST', body: JSON.stringify(body) });
+export const openWorktree = (body: {
+  projectId: string;
+  worktreePath: string;
+  branch: string | null;
+  sessionId?: string;
+  fresh?: boolean;
+}) => api<AgentMeta>('/worktrees/open', { method: 'POST', body: JSON.stringify(body) });
+
+export const listDiscussions = (worktreePath: string) =>
+  api<{ discussions: Discussion[] }>(`/worktrees/discussions?path=${encodeURIComponent(worktreePath)}`);
 
 export const deleteWorktree = (body: {
   projectId: string;

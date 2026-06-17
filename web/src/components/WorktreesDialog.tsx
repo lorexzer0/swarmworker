@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react';
-import type { WorktreeRow } from '../types';
-import { listWorktrees, openWorktree, deleteWorktree } from '../actions';
-import { STATUS_COLOR, STATUS_LABEL } from '../util';
+import type { Discussion, WorktreeRow } from '../types';
+import { listWorktrees, openWorktree, deleteWorktree, listDiscussions } from '../actions';
+import { STATUS_COLOR, STATUS_LABEL, fmtAgo } from '../util';
 import { Modal } from './Modal';
+
+type OpenOpts = { sessionId?: string; fresh?: boolean };
 
 export function WorktreesDialog({
   onClose,
@@ -23,11 +25,11 @@ export function WorktreesDialog({
   };
   useEffect(load, []);
 
-  const doOpen = async (w: WorktreeRow) => {
+  const doOpen = async (w: WorktreeRow, opts?: OpenOpts) => {
     setBusy(w.path);
     setErr('');
     try {
-      const meta = await openWorktree({ projectId: w.projectId, worktreePath: w.path, branch: w.branch });
+      const meta = await openWorktree({ projectId: w.projectId, worktreePath: w.path, branch: w.branch, ...opts });
       onOpenAgent(meta.id);
     } catch (e: any) {
       setErr(e.message);
@@ -85,7 +87,7 @@ export function WorktreesDialog({
               key={w.path}
               w={w}
               busy={busy === w.path}
-              onOpen={() => doOpen(w)}
+              onOpen={(opts) => doOpen(w, opts)}
               onDelete={() => doDelete(w)}
             />
           ))}
@@ -103,14 +105,21 @@ function WorktreeItem({
 }: {
   w: WorktreeRow;
   busy: boolean;
-  onOpen: () => void;
+  onOpen: (opts?: OpenOpts) => void;
   onDelete: () => void;
 }) {
+  const [expanded, setExpanded] = useState(false);
+  const running = w.agent?.status === 'running' || w.agent?.status === 'starting';
+
+  // Primary action: focus/resume a bound agent, else continue the latest
+  // discussion, else start the first one.
   const openLabel = w.agent
-    ? w.agent.status === 'running' || w.agent.status === 'starting'
+    ? running
       ? 'open'
       : 'resume'
-    : 'start agent';
+    : w.discussions > 0
+      ? 'resume latest'
+      : 'start agent';
 
   return (
     <div className={`wt-row ${w.isMain ? 'main' : ''}`}>
@@ -131,25 +140,90 @@ function WorktreeItem({
             {STATUS_LABEL[w.agent.status]}
           </span>
         )}
+        {w.discussions > 0 && (
+          <button
+            className="wt-disc-toggle"
+            onClick={() => setExpanded((v) => !v)}
+            title="Prior Claude conversations here — click to pick one"
+          >
+            {expanded ? '▾' : '▸'} 💬 {w.discussions}
+          </button>
+        )}
         {w.dirtyFiles > 0 && <span className="wt-dirty" title="uncommitted files">● {w.dirtyFiles} dirty</span>}
         {w.commitsAhead > 0 && <span className="muted" title="commits ahead of default branch">↑{w.commitsAhead}</span>}
         <span className="muted">{w.head}</span>
       </div>
 
       <div className="wt-actions">
+        <button
+          className="act go"
+          disabled={busy}
+          onClick={() => onOpen()}
+          title={w.isMain ? 'Work directly in the repo checkout (no worktree)' : 'Continue working in this worktree'}
+        >
+          {busy ? '…' : `▶ ${openLabel}`}
+        </button>
+        {!running && w.discussions > 0 && (
+          <button className="act" disabled={busy} onClick={() => onOpen({ fresh: true })} title="Start a new conversation here">
+            ＋ new
+          </button>
+        )}
         {w.isMain ? (
-          <span className="muted small">—</span>
+          <span className="muted small" title="the repo's main checkout is never deleted">—</span>
         ) : (
-          <>
-            <button className="act go" disabled={busy} onClick={onOpen} title="Continue working in this worktree">
-              {busy ? '…' : `▶ ${openLabel}`}
-            </button>
-            <button className="act del" disabled={busy} onClick={onDelete} title="Delete worktree">
-              ✕ delete
-            </button>
-          </>
+          <button className="act del" disabled={busy} onClick={onDelete} title="Delete worktree">
+            ✕ delete
+          </button>
         )}
       </div>
+
+      {expanded && (
+        <DiscussionList
+          worktreePath={w.path}
+          disabled={busy || running}
+          onResume={(sessionId) => onOpen({ sessionId })}
+        />
+      )}
+    </div>
+  );
+}
+
+function DiscussionList({
+  worktreePath,
+  disabled,
+  onResume,
+}: {
+  worktreePath: string;
+  disabled: boolean;
+  onResume: (sessionId: string) => void;
+}) {
+  const [items, setItems] = useState<Discussion[] | null>(null);
+  const [err, setErr] = useState('');
+
+  useEffect(() => {
+    listDiscussions(worktreePath)
+      .then((r) => setItems(r.discussions))
+      .catch((e) => setErr(e.message));
+  }, [worktreePath]);
+
+  if (err) return <div className="wt-discussions err small">{err}</div>;
+  if (!items) return <div className="wt-discussions muted small">loading discussions…</div>;
+  if (!items.length) return <div className="wt-discussions muted small">no recorded discussions</div>;
+
+  return (
+    <div className="wt-discussions">
+      {items.map((d) => (
+        <button
+          key={d.sessionId}
+          className="wt-disc"
+          disabled={disabled}
+          onClick={() => onResume(d.sessionId)}
+          title={disabled ? 'stop the running agent to switch discussions' : 'Resume this conversation'}
+        >
+          <span className="wt-disc-title">{d.title || d.preview || `session ${d.sessionId.slice(0, 8)}`}</span>
+          <span className="wt-disc-meta muted">{fmtAgo(d.updatedAt)}</span>
+        </button>
+      ))}
     </div>
   );
 }
