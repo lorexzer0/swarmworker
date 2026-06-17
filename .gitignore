@@ -1,0 +1,15 @@
+node_modules/
+dist/
+*.log
+
+# build / tooling artifacts
+web/dist/
+server/dist/
+.vite/
+
+# playwright-mcp verification artifacts
+.playwright-mcp/
+*.png
+
+# local data (also lives in ~/.swarmworker)
+.swarmworker/
