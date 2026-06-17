@@ -64,8 +64,9 @@ function AgentTile({
         <span className="tile-name" title={agent.branch}>
           {agent.name}
         </span>
-        <span className="tile-proj" title={agent.worktreePath}>
-          {agent.projectName}
+        <span className="tile-proj">{agent.projectName}</span>
+        <span className="tile-wt mono small muted" title={agent.worktreePath}>
+          {agent.worktreePath}
         </span>
         <span className="spacer" />
         <Tokens agent={agent} compact />
@@ -96,6 +97,9 @@ function ExpandOverlay({ agent, onClose }: { agent: AgentMeta; onClose: () => vo
           <strong>{agent.name}</strong>
           <span className="muted small">
             {agent.projectName} · {agent.branch} (base {agent.baseBranch})
+          </span>
+          <span className="muted small mono viewer-wt" title={agent.worktreePath}>
+            {agent.worktreePath}
           </span>
           <span className="spacer" />
           <Tokens agent={agent} />

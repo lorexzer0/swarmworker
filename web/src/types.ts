@@ -75,6 +75,7 @@ export interface WorktreeRow {
   dirtyFiles: number;
   commitsAhead: number;
   discussions: number; // count of prior Claude conversations for this cwd
+  liveAgents: number; // agents currently running in this worktree
   agent: { id: string; status: AgentStatus; model: string; mode: PermissionMode; name: string } | null;
 }
 

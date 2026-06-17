@@ -108,14 +108,12 @@ export class AgentManager extends EventEmitter {
     let base: string;
     if (opts.inPlace) {
       // Work directly in the repo's main checkout: no worktree, no new branch.
-      // We stay on whatever branch the repo is currently on.
+      // We stay on whatever branch the repo is currently on. Several agents may
+      // share one checkout (e.g. two researches + one writer), so we don't gate
+      // this — the UI just warns when a checkout already has a live agent.
       base = await currentBranch(repo);
       branch = base;
       worktreePath = repo;
-      const existing = this.findLiveByWorktree(worktreePath);
-      if (existing?.proc) {
-        throw new Error('an agent is already running in this repo checkout; open or stop it first');
-      }
     } else {
       base = opts.base || project.defaultBranch || (await currentBranch(repo));
       branch = opts.branch?.trim() || generateBranch(base, id);
@@ -308,25 +306,45 @@ export class AgentManager extends EventEmitter {
     return live.meta;
   }
 
-  private findLiveByWorktree(p: string): LiveAgent | undefined {
+  /** Every agent record (running or exited) bound to a worktree path. */
+  private agentsInWorktree(p: string): LiveAgent[] {
     const norm = path.normalize(p);
-    for (const live of this.agents.values()) {
-      if (path.normalize(live.meta.worktreePath) === norm) return live;
-    }
-    return undefined;
+    return [...this.agents.values()].filter(
+      (a) => path.normalize(a.meta.worktreePath) === norm,
+    );
   }
 
-  /** Metadata of any agent (live or exited) bound to a worktree path. */
+  /** Agents with a live PTY (running/starting) in a worktree. */
+  private runningInWorktree(p: string): LiveAgent[] {
+    return this.agentsInWorktree(p).filter((a) => a.proc);
+  }
+
+  /** A bound record with no live PTY — reusable for resume-in-place. */
+  private findIdleByWorktree(p: string): LiveAgent | undefined {
+    return this.agentsInWorktree(p).find((a) => !a.proc);
+  }
+
+  /** How many agents currently have a live PTY in this worktree. */
+  liveAgentCount(p: string): number {
+    return this.runningInWorktree(p).length;
+  }
+
+  /** Representative agent for a worktree row — prefer a live one, else any. */
   findByWorktree(p: string): AgentMeta | undefined {
-    return this.findLiveByWorktree(p)?.meta;
+    const all = this.agentsInWorktree(p);
+    return (all.find((a) => a.proc) ?? all[0])?.meta;
   }
 
   /**
    * "Continue working" on an existing worktree. Re-entering a worktree almost
    * always means picking up a prior conversation, so by default we resume the
    * requested discussion (`sessionId`), or the most recent one if none is given.
-   * Pass `fresh` to start a brand-new conversation instead. If an agent is
-   * already bound to the worktree we reuse that record. No new worktree is made.
+   * Pass `fresh` to start a brand-new conversation instead.
+   *
+   * A worktree may host several agents at once (e.g. two researches + one
+   * writer). We focus a conversation that is already live rather than launching
+   * a duplicate PTY, reuse an idle bound record where one exists, and otherwise
+   * start an ADDITIONAL agent alongside whatever is already running here.
    */
   async openWorktree(opts: {
     projectId: string;
@@ -336,29 +354,37 @@ export class AgentManager extends EventEmitter {
     fresh?: boolean;
   }): Promise<AgentMeta> {
     const worktreePath = path.normalize(opts.worktreePath);
+    const running = this.runningInWorktree(worktreePath);
 
-    const existing = this.findLiveByWorktree(worktreePath);
-    if (existing) {
-      if (existing.proc) {
-        // Can't hot-swap a live PTY onto another conversation.
-        if (opts.sessionId && existing.meta.sessionId !== opts.sessionId) {
-          throw new Error('an agent is already running here; stop it before switching discussions');
-        }
-        return existing.meta;
+    // Focus an already-live conversation instead of opening a duplicate PTY:
+    //  - an explicit session some agent here is already running, or
+    //  - a plain re-open (no session, not fresh) → focus the latest live agent.
+    if (!opts.fresh) {
+      if (opts.sessionId) {
+        const onSession = running.find((a) => a.meta.sessionId === opts.sessionId);
+        if (onSession) return onSession.meta;
+      } else if (running.length) {
+        return running[running.length - 1].meta;
       }
+    }
+
+    // Reuse an idle bound record (resume in place) only when nothing is live
+    // here — keeps records tidy after a restart. With an agent already running,
+    // a fresh/different conversation falls through to spawn a second agent.
+    const idle = this.findIdleByWorktree(worktreePath);
+    if (idle && !running.length) {
       if (opts.fresh) {
-        ensureTrusted(existing.meta.worktreePath);
-        existing.meta.sessionId = randomUUID();
-        this.relaunch(existing, ['--session-id', existing.meta.sessionId], {
-          renameTo: toSnakeCase(existing.meta.name),
+        ensureTrusted(idle.meta.worktreePath);
+        idle.meta.sessionId = randomUUID();
+        this.relaunch(idle, ['--session-id', idle.meta.sessionId], {
+          renameTo: toSnakeCase(idle.meta.name),
         });
-        this.emit('update', existing.meta);
-        return existing.meta;
+        this.emit('update', idle.meta);
+        return idle.meta;
       }
-      // Default / explicit pick: resume a conversation. An explicit sessionId
-      // repoints the agent; otherwise resume() continues its own last session.
-      if (opts.sessionId) existing.meta.sessionId = opts.sessionId;
-      return this.resume(existing.meta.id);
+      // Explicit sessionId repoints the record; otherwise resume its own session.
+      if (opts.sessionId) idle.meta.sessionId = opts.sessionId;
+      return this.resume(idle.meta.id);
     }
 
     const cap = this.store.state.settings.concurrencyCap;
@@ -420,8 +446,8 @@ export class AgentManager extends EventEmitter {
     if (path.normalize(worktreePath) === path.normalize(repo)) {
       throw new Error('cannot delete the repository\'s main worktree');
     }
-    const live = this.findLiveByWorktree(worktreePath);
-    if (live) {
+    // A worktree can host several agents — clean up every one bound to it.
+    for (const live of this.agentsInWorktree(worktreePath)) {
       await this.stop(live.meta.id);
       this.agents.delete(live.meta.id);
       this.emit('removed', live.meta.id);
@@ -435,7 +461,7 @@ export class AgentManager extends EventEmitter {
       }
     }
     this.syncStore();
-    this.emit('update', live?.meta ?? ({ id: '' } as AgentMeta));
+    this.emit('update', { id: '' } as AgentMeta);
   }
 
   async remove(id: string, deleteWorktree: boolean): Promise<void> {

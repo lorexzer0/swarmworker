@@ -110,6 +110,7 @@ function WorktreeItem({
 }) {
   const [expanded, setExpanded] = useState(false);
   const running = w.agent?.status === 'running' || w.agent?.status === 'starting';
+  const live = w.liveAgents ?? (running ? 1 : 0);
 
   // Primary action: focus/resume a bound agent, else continue the latest
   // discussion, else start the first one.
@@ -163,8 +164,13 @@ function WorktreeItem({
         >
           {busy ? '…' : `▶ ${openLabel}`}
         </button>
-        {!running && w.discussions > 0 && (
-          <button className="act" disabled={busy} onClick={() => onOpen({ fresh: true })} title="Start a new conversation here">
+        {(w.agent || w.discussions > 0) && (
+          <button
+            className="act"
+            disabled={busy}
+            onClick={() => onOpen({ fresh: true })}
+            title={live > 0 ? 'Start another agent here (shares this checkout)' : 'Start a new conversation here'}
+          >
             ＋ new
           </button>
         )}
@@ -177,10 +183,17 @@ function WorktreeItem({
         )}
       </div>
 
+      {live > 0 && (
+        <div className="wt-warn small">
+          ⚠ {live} agent{live > 1 ? 's' : ''} already live in this worktree — opening another shares the same files.
+        </div>
+      )}
+
       {expanded && (
         <DiscussionList
           worktreePath={w.path}
-          disabled={busy || running}
+          disabled={busy}
+          live={live > 0}
           onResume={(sessionId) => onOpen({ sessionId })}
         />
       )}
@@ -191,10 +204,12 @@ function WorktreeItem({
 function DiscussionList({
   worktreePath,
   disabled,
+  live,
   onResume,
 }: {
   worktreePath: string;
   disabled: boolean;
+  live: boolean;
   onResume: (sessionId: string) => void;
 }) {
   const [items, setItems] = useState<Discussion[] | null>(null);
@@ -218,7 +233,7 @@ function DiscussionList({
           className="wt-disc"
           disabled={disabled}
           onClick={() => onResume(d.sessionId)}
-          title={disabled ? 'stop the running agent to switch discussions' : 'Resume this conversation'}
+          title={live ? 'Resume this conversation in another agent (shares this checkout)' : 'Resume this conversation'}
         >
           <span className="wt-disc-title">{d.title || d.preview || `session ${d.sessionId.slice(0, 8)}`}</span>
           <span className="wt-disc-meta muted">{fmtAgo(d.updatedAt)}</span>

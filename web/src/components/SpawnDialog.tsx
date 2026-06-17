@@ -5,7 +5,7 @@ import { addProject, getBranches, spawnAgent } from '../actions';
 import { Modal } from './Modal';
 
 export function SpawnDialog({ onClose }: { onClose: () => void }) {
-  const { projects, settings } = useApp();
+  const { projects, settings, agents } = useApp();
   const [projectId, setProjectId] = useState(projects[0]?.id || '');
   const [branches, setBranches] = useState<string[]>([]);
   const [base, setBase] = useState('');
@@ -75,6 +75,18 @@ export function SpawnDialog({ onClose }: { onClose: () => void }) {
     }
   };
 
+  // Warn (don't block) when the selected checkout already has a live in-place
+  // agent — a second one shares the same working files.
+  const project = projects.find((p) => p.id === projectId);
+  const inPlaceLive = inPlace && project
+    ? agents.filter(
+        (a) =>
+          a.inPlace &&
+          (a.status === 'running' || a.status === 'starting') &&
+          a.repoPath === project.path,
+      ).length
+    : 0;
+
   return (
     <Modal title="New agent" onClose={onClose} wide>
       <div className="form">
@@ -114,6 +126,13 @@ export function SpawnDialog({ onClose }: { onClose: () => void }) {
             <span className="muted small"> — runs on the repo's current branch; no separate worktree or branch is created.</span>
           </span>
         </label>
+
+        {inPlaceLive > 0 && (
+          <div className="warn">
+            ⚠ {inPlaceLive} agent{inPlaceLive > 1 ? 's' : ''} already running in this checkout. A new one shares the same
+            working files — fine for parallel research, risky for concurrent edits.
+          </div>
+        )}
 
         {!inPlace && (
           <div className="grid2">

@@ -151,6 +151,7 @@ app.get('/api/worktrees', async (_req, res) => {
           projectName: project.name,
           ...w,
           discussions: countSessions(w.path),
+          liveAgents: manager.liveAgentCount(w.path),
           agent: agent
             ? { id: agent.id, status: agent.status, model: agent.model, mode: agent.mode, name: agent.name }
             : null,
