@@ -14,13 +14,52 @@ async function git(repo: string, args: string[]): Promise<string> {
   return stdout.trim();
 }
 
-export async function isGitRepo(dir: string): Promise<boolean> {
+/** Run git capturing failure (stdout/stderr) instead of throwing. */
+async function gitTry(repo: string, args: string[]): Promise<{ ok: boolean; out: string; err: string }> {
   try {
-    const out = await git(dir, ['rev-parse', '--is-inside-work-tree']);
-    return out === 'true';
-  } catch {
-    return false;
+    const { stdout } = await pexec('git', ['-C', repo, ...args], {
+      maxBuffer: 1024 * 1024 * 16,
+      windowsHide: true,
+    });
+    return { ok: true, out: stdout.trim(), err: '' };
+  } catch (e: any) {
+    return { ok: false, out: String(e?.stdout ?? '').trim(), err: String(e?.stderr ?? e?.message ?? '') };
   }
+}
+
+/** safe.directory entries use the absolute path with forward slashes. */
+function gitPathKey(dir: string): string {
+  return path.resolve(dir).replace(/\\/g, '/');
+}
+
+/**
+ * Git refuses to operate in a directory owned by a different user ("dubious
+ * ownership") — common on Windows across drives or accounts. Add a global
+ * `safe.directory` exception (idempotent) so our own tool can read the repo,
+ * mirroring the auto-trust we already do for Claude's workspace dialog.
+ * Returns true if a new exception was added.
+ */
+export async function trustGitDir(dir: string): Promise<boolean> {
+  const key = gitPathKey(dir);
+  const cur = await gitTry(dir, ['config', '--global', '--get-all', 'safe.directory']);
+  if (cur.ok) {
+    const vals = cur.out.split(/\r?\n/).map((s) => s.trim());
+    if (vals.includes('*') || vals.includes(key)) return false;
+  }
+  const res = await gitTry(dir, ['config', '--global', '--add', 'safe.directory', key]);
+  return res.ok;
+}
+
+export async function isGitRepo(dir: string): Promise<boolean> {
+  let r = await gitTry(dir, ['rev-parse', '--is-inside-work-tree']);
+  // A real repo owned by another user aborts with exit 128 ("dubious
+  // ownership"); don't misreport that as "not a git repository". Trust it and
+  // retry once.
+  if (!r.ok && /dubious ownership/i.test(r.err)) {
+    await trustGitDir(dir);
+    r = await gitTry(dir, ['rev-parse', '--is-inside-work-tree']);
+  }
+  return r.ok && r.out === 'true';
 }
 
 /** The repo's top-level dir (so a registered subdir resolves to its root). */
