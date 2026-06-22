@@ -87,6 +87,11 @@ export function SpawnDialog({ onClose }: { onClose: () => void }) {
       ).length
     : 0;
 
+  // Non-blocking base-branch validation: only flag a typed base we know isn't a
+  // branch here. If branches couldn't be listed we stay silent (can't tell).
+  const baseUnknown =
+    !inPlace && base.trim() !== '' && branches.length > 0 && !branches.includes(base.trim());
+
   return (
     <Modal title="New agent" onClose={onClose} wide>
       <div className="form">
@@ -135,24 +140,37 @@ export function SpawnDialog({ onClose }: { onClose: () => void }) {
         )}
 
         {!inPlace && (
-          <div className="grid2">
-            <label>
-              <span>Base branch (worktree forks from here)</span>
-              <select value={base} onChange={(e) => setBase(e.target.value)}>
-                {branches.length === 0 && <option value="">{base || '—'}</option>}
-                {base && !branches.includes(base) && <option value={base}>{base} (not found)</option>}
-                {branches.map((b) => (
-                  <option key={b} value={b}>
-                    {b}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label>
-              <span>New branch name (blank = auto)</span>
-              <input placeholder={`swarm/${base || 'base'}-xxxxxxxx`} value={branch} onChange={(e) => setBranch(e.target.value)} />
-            </label>
-          </div>
+          <>
+            <div className="grid2">
+              <label>
+                <span>Base branch (worktree forks from here)</span>
+                <input
+                  list="sw-base-branches"
+                  value={base}
+                  onChange={(e) => setBase(e.target.value)}
+                  placeholder="branch or commit to fork from"
+                  spellCheck={false}
+                  autoCapitalize="off"
+                  autoCorrect="off"
+                />
+                <datalist id="sw-base-branches">
+                  {branches.map((b) => (
+                    <option key={b} value={b} />
+                  ))}
+                </datalist>
+              </label>
+              <label>
+                <span>New branch name (blank = auto)</span>
+                <input placeholder={`swarm/${base || 'base'}-xxxxxxxx`} value={branch} onChange={(e) => setBranch(e.target.value)} />
+              </label>
+            </div>
+            {baseUnknown && (
+              <div className="warn">
+                ⚠ "{base.trim()}" isn't an existing branch in this repo. Spawning works only if it's a valid branch or commit
+                to fork from — otherwise it'll fail.
+              </div>
+            )}
+          </>
         )}
 
         <div className="grid2">
