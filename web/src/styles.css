@@ -142,6 +142,11 @@ table.agents tbody tr.sel { background: #142233; }
 .chip.mode-plan { color: #0a1f2a; background: var(--accent-2); border-color: var(--accent-2); }
 .chip.mode-acceptEdits { color: #0a2113; background: var(--green); border-color: var(--green); }
 
+.profile-pick {
+  font-size: 11px; padding: 3px 6px; max-width: 170px;
+  background: #0a0f16; color: var(--text); border: 1px solid var(--line); border-radius: 6px;
+}
+
 .tokens { display: inline-flex; gap: 8px; font-variant-numeric: tabular-nums; font-size: 11px; }
 .tok.in { color: var(--accent-2); }
 .tok.out { color: var(--accent); }

@@ -86,6 +86,31 @@ export async function scanReposUnder(root: string, maxDepth = SCAN_MAX_DEPTH): P
   return found;
 }
 
+/** The machine's global git identity + signing config (for profile prefill). */
+export async function globalGitIdentity(): Promise<{
+  userName: string;
+  userEmail: string;
+  signingKey: string;
+  gpgSign: boolean;
+  gpgFormat: 'openpgp' | 'ssh';
+}> {
+  const get = async (key: string) => (await gitTry('.', ['config', '--global', '--get', key])).out;
+  const [userName, userEmail, signingKey, sign, format] = await Promise.all([
+    get('user.name'),
+    get('user.email'),
+    get('user.signingkey'),
+    get('commit.gpgsign'),
+    get('gpg.format'),
+  ]);
+  return {
+    userName,
+    userEmail,
+    signingKey,
+    gpgSign: /^(true|1|yes|on)$/i.test(sign),
+    gpgFormat: format === 'ssh' ? 'ssh' : 'openpgp',
+  };
+}
+
 export async function isGitRepo(dir: string): Promise<boolean> {
   let r = await gitTry(dir, ['rev-parse', '--is-inside-work-tree']);
   // A real repo owned by another user aborts with exit 128 ("dubious

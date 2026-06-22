@@ -6,9 +6,10 @@ import { Modal } from './Modal';
 import { SearchableSelect } from './SearchableSelect';
 
 export function SpawnDialog({ onClose, onManageProjects }: { onClose: () => void; onManageProjects: () => void }) {
-  const { settings, agents } = useApp();
+  const { settings, agents, profiles } = useApp();
   const [repos, setRepos] = useState<DiscoveredRepo[] | null>(null);
   const [repoPath, setRepoPath] = useState('');
+  const [profileId, setProfileId] = useState(settings?.defaultProfileId ?? '');
   const [branches, setBranches] = useState<string[]>([]);
   const [base, setBase] = useState('');
   const [branch, setBranch] = useState('');
@@ -62,6 +63,7 @@ export function SpawnDialog({ onClose, onManageProjects }: { onClose: () => void
         name: name.trim() || undefined,
         initialPrompt: prompt.trim() || undefined,
         inPlace,
+        profileId: profileId || undefined,
       });
       onClose();
     } catch (e: any) {
@@ -184,6 +186,19 @@ export function SpawnDialog({ onClose, onManageProjects }: { onClose: () => void
             </select>
           </label>
         </div>
+
+        <label>
+          <span>Git profile (identity + signing for this agent's commits)</span>
+          <select value={profileId} onChange={(e) => setProfileId(e.target.value)}>
+            <option value="">— ambient git config —</option>
+            {profiles.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.label} — {p.userEmail}
+                {p.gpgSign ? ' · signed' : ''}
+              </option>
+            ))}
+          </select>
+        </label>
 
         <label>
           <span>Display name (optional)</span>

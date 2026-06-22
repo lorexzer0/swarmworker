@@ -11,6 +11,7 @@ export function TopBar({
   onSettings,
   onWorktrees,
   onProjects,
+  onGitProfiles,
 }: {
   view: 'grid' | 'list';
   setView: (v: 'grid' | 'list') => void;
@@ -20,6 +21,7 @@ export function TopBar({
   onSettings: () => void;
   onWorktrees: () => void;
   onProjects: () => void;
+  onGitProfiles: () => void;
 }) {
   const { agents, connected, settings } = useApp();
   const live = agents.filter((a) => a.status === 'running' || a.status === 'starting').length;
@@ -73,6 +75,9 @@ export function TopBar({
       </button>
       <button className="ghost" onClick={onWorktrees} title="Worktree manager">
         ⌗ Worktrees
+      </button>
+      <button className="ghost" onClick={onGitProfiles} title="Git profiles — identity & signing per agent">
+        ⎇ Git
       </button>
       <button className="primary" onClick={onNew}>
         + New agent

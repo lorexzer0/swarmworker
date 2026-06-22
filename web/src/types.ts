@@ -47,6 +47,7 @@ export interface AgentMeta {
   baseBranch: string;
   worktreePath: string;
   inPlace: boolean;
+  profileId?: string;
   sessionId: string;
   model: string;
   mode: PermissionMode;
@@ -64,6 +65,28 @@ export interface Settings {
   defaultMode: PermissionMode;
   concurrencyCap: number;
   worktreeRoot: string;
+  defaultProfileId?: string;
+}
+
+/** A git identity + signing config that can be assigned to an agent. */
+export interface GitProfile {
+  id: string;
+  label: string;
+  userName: string;
+  userEmail: string;
+  gpgSign: boolean;
+  signingKey?: string;
+  gpgFormat?: 'openpgp' | 'ssh';
+}
+
+/** Form/draft shape when creating or editing a profile. */
+export interface GitProfileDraft {
+  label: string;
+  userName: string;
+  userEmail: string;
+  gpgSign: boolean;
+  signingKey?: string;
+  gpgFormat?: 'openpgp' | 'ssh';
 }
 
 export interface WorktreeRow {

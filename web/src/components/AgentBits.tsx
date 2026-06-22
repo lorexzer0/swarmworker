@@ -1,6 +1,7 @@
 import type { AgentMeta } from '../types';
+import { useApp } from '../store';
 import { STATUS_COLOR, STATUS_LABEL, fmtTokens } from '../util';
-import { stopAgent, resumeAgent, cycleAgentMode, deleteAgent } from '../actions';
+import { stopAgent, resumeAgent, cycleAgentMode, deleteAgent, setAgentProfile } from '../actions';
 
 export function StatusDot({ agent }: { agent: AgentMeta }) {
   return (
@@ -9,6 +10,29 @@ export function StatusDot({ agent }: { agent: AgentMeta }) {
       style={{ background: STATUS_COLOR[agent.status] }}
       title={STATUS_LABEL[agent.status]}
     />
+  );
+}
+
+/** Assign a git profile to an agent. Applies on the agent's next launch/resume. */
+export function AgentProfilePicker({ agent }: { agent: AgentMeta }) {
+  const { profiles } = useApp();
+  const running = agent.status === 'running' || agent.status === 'starting';
+  return (
+    <select
+      className="profile-pick"
+      value={agent.profileId ?? ''}
+      title={`Git identity + signing${running ? ' — applies on next resume' : ''}`}
+      onMouseDown={(e) => e.stopPropagation()}
+      onChange={(e) => setAgentProfile(agent.id, e.target.value || null).catch((err) => alert(err.message))}
+    >
+      <option value="">git: ambient</option>
+      {profiles.map((p) => (
+        <option key={p.id} value={p.id}>
+          {p.label}
+          {p.gpgSign ? ' ✶' : ''}
+        </option>
+      ))}
+    </select>
   );
 }
 

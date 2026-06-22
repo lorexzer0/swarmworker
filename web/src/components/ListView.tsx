@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useApp } from '../store';
 import { fmtAge, fmtTokens, useNow } from '../util';
 import { TerminalMount } from './TerminalMount';
-import { StatusDot, ModeChip, Tokens, AgentActions } from './AgentBits';
+import { StatusDot, ModeChip, Tokens, AgentActions, AgentProfilePicker } from './AgentBits';
 
 export function ListView({ onNew }: { onNew: () => void }) {
   const { agents } = useApp();
@@ -87,6 +87,7 @@ export function ListView({ onNew }: { onNew: () => void }) {
             <span className="muted small mono">{selected.worktreePath}</span>
             <span className="spacer" />
             <Tokens agent={selected} />
+            <AgentProfilePicker agent={selected} />
             <AgentActions agent={selected} />
           </div>
           <div className="dock-term">

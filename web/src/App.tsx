@@ -8,6 +8,7 @@ import { SpawnDialog } from './components/SpawnDialog';
 import { SettingsDialog } from './components/SettingsDialog';
 import { WorktreesDialog } from './components/WorktreesDialog';
 import { ProjectManager } from './components/ProjectManager';
+import { GitProfilesManager } from './components/GitProfilesManager';
 import type { GridCols } from './types';
 
 let started = false;
@@ -30,6 +31,7 @@ export function App() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [worktreesOpen, setWorktreesOpen] = useState(false);
   const [projectsOpen, setProjectsOpen] = useState(false);
+  const [gitProfilesOpen, setGitProfilesOpen] = useState(false);
   const [focusId, setFocusId] = useState<string | null>(null);
 
   const openAgent = (id: string) => {
@@ -73,6 +75,7 @@ export function App() {
         onSettings={() => setSettingsOpen(true)}
         onWorktrees={() => setWorktreesOpen(true)}
         onProjects={() => setProjectsOpen(true)}
+        onGitProfiles={() => setGitProfilesOpen(true)}
       />
       <main className="main">
         {view === 'grid' ? (
@@ -93,6 +96,7 @@ export function App() {
       {settingsOpen && <SettingsDialog onClose={() => setSettingsOpen(false)} />}
       {worktreesOpen && <WorktreesDialog onClose={() => setWorktreesOpen(false)} onOpenAgent={openAgent} />}
       {projectsOpen && <ProjectManager onClose={() => setProjectsOpen(false)} />}
+      {gitProfilesOpen && <GitProfilesManager onClose={() => setGitProfilesOpen(false)} />}
     </div>
   );
 }

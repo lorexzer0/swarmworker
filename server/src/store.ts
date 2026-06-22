@@ -54,11 +54,12 @@ export class Store {
       return {
         projects: parsed.projects ?? [],
         roots: parsed.roots ?? [],
+        profiles: parsed.profiles ?? [],
         settings,
         agents: parsed.agents ?? [],
       };
     } catch {
-      return { projects: [], roots: [], settings: defaultSettings(), agents: [] };
+      return { projects: [], roots: [], profiles: [], settings: defaultSettings(), agents: [] };
     }
   }
 

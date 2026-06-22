@@ -4,7 +4,7 @@ import { terminals } from '../terminals';
 import { fmtAge, useNow } from '../util';
 import type { AgentMeta, GridCols } from '../types';
 import { TerminalMount } from './TerminalMount';
-import { StatusDot, ModeChip, Tokens, AgentActions } from './AgentBits';
+import { StatusDot, ModeChip, Tokens, AgentActions, AgentProfilePicker } from './AgentBits';
 
 // Minimized tiles are remembered across view switches and reloads.
 const MINIMIZED_KEY = 'sw.minimized';
@@ -173,6 +173,7 @@ function ExpandOverlay({ agent, onClose }: { agent: AgentMeta; onClose: () => vo
           </span>
           <span className="spacer" />
           <Tokens agent={agent} />
+          <AgentProfilePicker agent={agent} />
           <ModeChip agent={agent} />
           <AgentActions agent={agent} />
           <button className="icon" onClick={onClose} title="Close viewer">

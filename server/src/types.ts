@@ -27,6 +27,17 @@ export interface Project {
   addedAt: number;
 }
 
+/** A git identity + signing config that can be assigned to an agent. */
+export interface GitProfile {
+  id: string;
+  label: string;
+  userName: string;
+  userEmail: string;
+  gpgSign: boolean;
+  signingKey?: string; // GPG key id/fingerprint, or SSH key (path or literal)
+  gpgFormat?: 'openpgp' | 'ssh';
+}
+
 /** A holding folder scanned for git repos (or a single repo path). */
 export interface ProjectRoot {
   id: string;
@@ -53,6 +64,7 @@ export interface AgentMeta {
   baseBranch: string;
   worktreePath: string;
   inPlace: boolean; // true = running in the repo's main checkout, no worktree
+  profileId?: string; // git profile applied to this agent's commits (env-injected)
   sessionId: string;
   model: string;
   mode: PermissionMode;
@@ -70,11 +82,13 @@ export interface Settings {
   defaultMode: PermissionMode;
   concurrencyCap: number;
   worktreeRoot: string;
+  defaultProfileId?: string; // git profile pre-selected for new agents
 }
 
 export interface PersistedState {
   projects: Project[];
   roots: ProjectRoot[];
+  profiles: GitProfile[];
   settings: Settings;
   agents: AgentMeta[];
 }

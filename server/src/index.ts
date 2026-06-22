@@ -18,9 +18,10 @@ import {
   listProjectWorktrees,
   worktreeDiffStat,
   scanReposUnder,
+  globalGitIdentity,
 } from './worktrees.js';
 import { countSessions, listSessions } from './tokens.js';
-import type { DiscoveredRepo, Project, ProjectRoot } from './types.js';
+import type { DiscoveredRepo, GitProfile, Project, ProjectRoot } from './types.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.PORT) || 8787;
@@ -37,6 +38,7 @@ app.get('/api/state', (_req, res) => {
   res.json({
     projects: store.state.projects,
     roots: store.state.roots,
+    profiles: store.state.profiles,
     agents: manager.list(),
     settings: store.state.settings,
   });
@@ -139,6 +141,68 @@ app.get('/api/repos/branches', async (req, res) => {
   }
 });
 
+// ---- git profiles (identity + signing, assignable per agent) ------------
+
+function sanitizeProfile(body: any, id: string): GitProfile {
+  const userName = String(body?.userName ?? '').trim();
+  const userEmail = String(body?.userEmail ?? '').trim();
+  if (!userName || !userEmail) throw new Error('name and email are required');
+  const gpgFormat = body?.gpgFormat === 'ssh' ? 'ssh' : 'openpgp';
+  return {
+    id,
+    label: String(body?.label ?? '').trim() || userName,
+    userName,
+    userEmail,
+    gpgSign: !!body?.gpgSign,
+    signingKey: String(body?.signingKey ?? '').trim() || undefined,
+    gpgFormat,
+  };
+}
+
+app.post('/api/profiles', (req, res) => {
+  try {
+    const profile = sanitizeProfile(req.body, randomUUID().slice(0, 8));
+    store.state.profiles.push(profile);
+    store.save();
+    broadcastState();
+    res.json(profile);
+  } catch (e: any) {
+    res.status(400).json({ error: String(e?.message || e) });
+  }
+});
+
+app.put('/api/profiles/:id', (req, res) => {
+  const idx = store.state.profiles.findIndex((p) => p.id === req.params.id);
+  if (idx < 0) return res.status(404).json({ error: 'unknown profile' });
+  try {
+    store.state.profiles[idx] = sanitizeProfile(req.body, req.params.id);
+    store.save();
+    broadcastState();
+    res.json(store.state.profiles[idx]);
+  } catch (e: any) {
+    res.status(400).json({ error: String(e?.message || e) });
+  }
+});
+
+app.delete('/api/profiles/:id', (req, res) => {
+  store.state.profiles = store.state.profiles.filter((p) => p.id !== req.params.id);
+  if (store.state.settings.defaultProfileId === req.params.id) {
+    store.updateSettings({ defaultProfileId: undefined });
+  }
+  store.save();
+  broadcastState();
+  res.json({ ok: true });
+});
+
+// The machine's global git identity — seeds the "new profile" form.
+app.get('/api/git/identity', async (_req, res) => {
+  try {
+    res.json(await globalGitIdentity());
+  } catch (e: any) {
+    res.status(500).json({ error: String(e?.message || e) });
+  }
+});
+
 app.delete('/api/projects/:id', (req, res) => {
   store.state.projects = store.state.projects.filter((p) => p.id !== req.params.id);
   store.save();
@@ -180,6 +244,7 @@ app.post('/api/agents', async (req, res) => {
       name: req.body?.name,
       initialPrompt: req.body?.initialPrompt,
       inPlace: !!req.body?.inPlace,
+      profileId: req.body?.profileId || undefined,
     });
     res.json(meta);
   } catch (e: any) {
@@ -203,6 +268,12 @@ app.post('/api/agents/:id/resume', (req, res) => {
 app.post('/api/agents/:id/mode/cycle', (req, res) => {
   manager.cycleMode(req.params.id);
   res.json({ ok: true });
+});
+
+app.patch('/api/agents/:id/profile', (req, res) => {
+  const meta = manager.setProfile(req.params.id, req.body?.profileId ?? null);
+  if (!meta) return res.status(404).json({ error: 'unknown agent' });
+  res.json(meta);
 });
 
 app.delete('/api/agents/:id', async (req, res) => {
@@ -307,6 +378,7 @@ function broadcastState(): void {
     t: 'state',
     projects: store.state.projects,
     roots: store.state.roots,
+    profiles: store.state.profiles,
     agents: manager.list(),
     settings: store.state.settings,
   });
@@ -323,6 +395,7 @@ wss.on('connection', (ws) => {
     t: 'state',
     projects: store.state.projects,
     roots: store.state.roots,
+    profiles: store.state.profiles,
     agents: manager.list(),
     settings: store.state.settings,
   });

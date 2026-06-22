@@ -3,6 +3,8 @@ import type {
   AgentMeta,
   DiscoveredRepo,
   Discussion,
+  GitProfile,
+  GitProfileDraft,
   Project,
   ProjectRoot,
   Settings,
@@ -40,6 +42,22 @@ export const addRoot = (path: string) =>
 export const removeRoot = (id: string) => api(`/roots/${id}`, { method: 'DELETE' });
 
 export const listRepos = () => api<{ repos: DiscoveredRepo[] }>('/repos');
+
+export const createProfile = (draft: GitProfileDraft) =>
+  api<GitProfile>('/profiles', { method: 'POST', body: JSON.stringify(draft) });
+
+export const updateProfile = (id: string, draft: GitProfileDraft) =>
+  api<GitProfile>(`/profiles/${id}`, { method: 'PUT', body: JSON.stringify(draft) });
+
+export const deleteProfile = (id: string) => api(`/profiles/${id}`, { method: 'DELETE' });
+
+export const getGitIdentity = () =>
+  api<{ userName: string; userEmail: string; signingKey: string; gpgSign: boolean; gpgFormat: 'openpgp' | 'ssh' }>(
+    '/git/identity',
+  );
+
+export const setAgentProfile = (id: string, profileId: string | null) =>
+  api<AgentMeta>(`/agents/${id}/profile`, { method: 'PATCH', body: JSON.stringify({ profileId }) });
 
 export const patchSettings = (body: Partial<Settings>) =>
   api<Settings>('/settings', { method: 'PATCH', body: JSON.stringify(body) });

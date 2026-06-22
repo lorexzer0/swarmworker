@@ -58,6 +58,8 @@ export interface SpawnOptions {
   initialPrompt?: string;
   /** Run directly in the repo's main checkout (no worktree, no new branch). */
   inPlace?: boolean;
+  /** Git profile (identity + signing) applied to this agent's commits. */
+  profileId?: string;
 }
 
 export class AgentManager extends EventEmitter {
@@ -158,6 +160,7 @@ export class AgentManager extends EventEmitter {
       baseBranch: base,
       worktreePath,
       inPlace: !!opts.inPlace,
+      profileId: opts.profileId || undefined,
       sessionId,
       model,
       mode,
@@ -204,7 +207,7 @@ export class AgentManager extends EventEmitter {
       cols: meta.cols,
       rows: meta.rows,
       cwd: meta.worktreePath,
-      env: sanitizedEnv({ FORCE_COLOR: '1' }),
+      env: sanitizedEnv({ FORCE_COLOR: '1', ...this.gitProfileEnv(meta.profileId) }),
     });
     live.proc = proc;
     meta.status = 'starting';
@@ -317,6 +320,40 @@ export class AgentManager extends EventEmitter {
   /** Cycle the permission mode via the TUI's native Shift+Tab. */
   cycleMode(id: string): void {
     this.agents.get(id)?.proc?.write(SHIFT_TAB);
+  }
+
+  /**
+   * Build the env that pins git's identity + signing for an agent. Uses git's
+   * GIT_CONFIG_COUNT/KEY/VALUE override so it applies to every git command the
+   * agent runs, per-process, without touching any on-disk config.
+   */
+  private gitProfileEnv(profileId?: string): Record<string, string> {
+    if (!profileId) return {};
+    const p = this.store.state.profiles?.find((x) => x.id === profileId);
+    if (!p) return {};
+    const kv: [string, string][] = [];
+    if (p.userName) kv.push(['user.name', p.userName]);
+    if (p.userEmail) kv.push(['user.email', p.userEmail]);
+    kv.push(['commit.gpgsign', p.gpgSign ? 'true' : 'false']);
+    kv.push(['tag.gpgsign', p.gpgSign ? 'true' : 'false']);
+    if (p.gpgSign && p.signingKey) kv.push(['user.signingkey', p.signingKey]);
+    if (p.gpgSign && p.gpgFormat) kv.push(['gpg.format', p.gpgFormat]);
+    const env: Record<string, string> = { GIT_CONFIG_COUNT: String(kv.length) };
+    kv.forEach(([k, v], i) => {
+      env[`GIT_CONFIG_KEY_${i}`] = k;
+      env[`GIT_CONFIG_VALUE_${i}`] = v;
+    });
+    return env;
+  }
+
+  /** Assign a git profile to an agent. Takes effect on its next (re)launch. */
+  setProfile(id: string, profileId: string | null): AgentMeta | undefined {
+    const live = this.agents.get(id);
+    if (!live) return undefined;
+    live.meta.profileId = profileId || undefined;
+    this.syncStore();
+    this.emit('update', live.meta);
+    return live.meta;
   }
 
   async stop(id: string): Promise<void> {
