@@ -1,15 +1,20 @@
 import { useApp } from '../store';
 import { fmtTokens } from '../util';
+import { GRID_COLS, type GridCols } from '../types';
 
 export function TopBar({
   view,
   setView,
+  gridCols,
+  setGridCols,
   onNew,
   onSettings,
   onWorktrees,
 }: {
   view: 'grid' | 'list';
   setView: (v: 'grid' | 'list') => void;
+  gridCols: GridCols;
+  setGridCols: (c: GridCols) => void;
   onNew: () => void;
   onSettings: () => void;
   onWorktrees: () => void;
@@ -32,6 +37,20 @@ export function TopBar({
           ≣ List
         </button>
       </div>
+      {view === 'grid' && (
+        <div className="seg" title="Grid columns (auto = fit to width)">
+          {GRID_COLS.map((c) => (
+            <button
+              key={c}
+              className={gridCols === c ? 'on' : ''}
+              onClick={() => setGridCols(c)}
+              title={c === 'auto' ? 'Auto-fit columns to width' : `${c} column${c > 1 ? 's' : ''}`}
+            >
+              {c === 'auto' ? 'auto' : c}
+            </button>
+          ))}
+        </div>
+      )}
       <span className="stat">
         <b>{live}</b>/{agents.length} live
       </span>

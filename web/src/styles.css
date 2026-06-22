@@ -66,8 +66,10 @@ button.ghost {
 .main { flex: 1 1 auto; min-height: 0; overflow: hidden; }
 
 /* ---- grid (camera) view ---- */
+.grid-view { display: flex; flex-direction: column; height: 100%; min-height: 0; }
 .grid {
-  height: 100%;
+  flex: 1 1 auto;
+  min-height: 0;
   overflow: auto;
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
@@ -75,6 +77,21 @@ button.ghost {
   gap: 4px;
   padding: 0;
 }
+
+/* dock of minimized windows */
+.grid-dock {
+  flex: 0 0 auto; display: flex; align-items: center; flex-wrap: wrap; gap: 6px;
+  padding: 6px 8px; background: var(--panel-2); border-top: 1px solid var(--line);
+}
+.grid-dock-label { flex: 0 0 auto; margin-right: 2px; text-transform: uppercase; letter-spacing: 0.4px; }
+.grid-pill {
+  display: inline-flex; align-items: center; gap: 6px; max-width: 240px;
+  background: var(--panel); color: var(--text); border: 1px solid var(--line);
+  border-radius: 999px; padding: 3px 10px; cursor: pointer; font-size: 12px;
+}
+.grid-pill:hover { border-color: var(--accent-2); }
+.grid-pill-name { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.grid-pill-proj { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .tile {
   display: flex; flex-direction: column;
   background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius);

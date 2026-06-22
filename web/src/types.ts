@@ -17,6 +17,10 @@ export const PERMISSION_MODES: PermissionMode[] = [
 
 export type AgentStatus = 'starting' | 'running' | 'exited' | 'error';
 
+/** Grid layout: 'auto' = responsive auto-fit; a number = fixed column count. */
+export type GridCols = 'auto' | 1 | 2 | 3 | 4;
+export const GRID_COLS: GridCols[] = ['auto', 1, 2, 3, 4];
+
 export interface TokenUsage {
   inputTokens: number;
   outputTokens: number;

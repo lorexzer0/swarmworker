@@ -7,11 +7,24 @@ import { ListView } from './components/ListView';
 import { SpawnDialog } from './components/SpawnDialog';
 import { SettingsDialog } from './components/SettingsDialog';
 import { WorktreesDialog } from './components/WorktreesDialog';
+import type { GridCols } from './types';
 
 let started = false;
 
+const GRIDCOLS_KEY = 'sw.gridCols';
+function loadGridCols(): GridCols {
+  try {
+    const v = localStorage.getItem(GRIDCOLS_KEY);
+    if (v === '1' || v === '2' || v === '3' || v === '4') return Number(v) as GridCols;
+  } catch {
+    /* storage unavailable */
+  }
+  return 'auto';
+}
+
 export function App() {
   const [view, setView] = useState<'grid' | 'list'>('grid');
+  const [gridCols, setGridCols] = useState<GridCols>(loadGridCols);
   const [spawnOpen, setSpawnOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [worktreesOpen, setWorktreesOpen] = useState(false);
@@ -39,18 +52,28 @@ export function App() {
     return () => clearTimeout(t);
   }, [view]);
 
+  useEffect(() => {
+    try {
+      localStorage.setItem(GRIDCOLS_KEY, String(gridCols));
+    } catch {
+      /* storage unavailable */
+    }
+  }, [gridCols]);
+
   return (
     <div className="app">
       <TopBar
         view={view}
         setView={setView}
+        gridCols={gridCols}
+        setGridCols={setGridCols}
         onNew={() => setSpawnOpen(true)}
         onSettings={() => setSettingsOpen(true)}
         onWorktrees={() => setWorktreesOpen(true)}
       />
       <main className="main">
         {view === 'grid' ? (
-          <GridView onNew={() => setSpawnOpen(true)} focusId={focusId} onFocused={() => setFocusId(null)} />
+          <GridView cols={gridCols} onNew={() => setSpawnOpen(true)} focusId={focusId} onFocused={() => setFocusId(null)} />
         ) : (
           <ListView onNew={() => setSpawnOpen(true)} />
         )}
