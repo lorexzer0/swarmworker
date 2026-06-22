@@ -62,6 +62,14 @@ class TerminalManager {
   /** Move this agent's terminal into `container` and fit it to that size. */
   mount(agentId: string, container: HTMLElement) {
     const e = this.ensure(agentId);
+    // A container shows exactly one terminal. Evict any other agent's wrapper
+    // left behind — e.g. the list dock reuses one node across selections, so
+    // without this the previous agent's terminal stays stacked on top.
+    for (const child of Array.from(container.children)) {
+      if (child !== e.wrapper && child instanceof HTMLElement && child.classList.contains('term-wrapper')) {
+        container.removeChild(child);
+      }
+    }
     if (e.wrapper.parentElement !== container) container.appendChild(e.wrapper);
     this.fit(agentId);
   }
