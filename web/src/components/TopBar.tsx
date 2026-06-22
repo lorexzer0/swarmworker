@@ -10,6 +10,7 @@ export function TopBar({
   onNew,
   onSettings,
   onWorktrees,
+  onProjects,
 }: {
   view: 'grid' | 'list';
   setView: (v: 'grid' | 'list') => void;
@@ -18,6 +19,7 @@ export function TopBar({
   onNew: () => void;
   onSettings: () => void;
   onWorktrees: () => void;
+  onProjects: () => void;
 }) {
   const { agents, connected, settings } = useApp();
   const live = agents.filter((a) => a.status === 'running' || a.status === 'starting').length;
@@ -66,6 +68,9 @@ export function TopBar({
       <span className={`conn ${connected ? 'ok' : 'bad'}`} title={connected ? 'backend connected' : 'reconnecting…'}>
         {connected ? '● connected' : '○ offline'}
       </span>
+      <button className="ghost" onClick={onProjects} title="Project manager — add folders of repos">
+        ⊞ Projects
+      </button>
       <button className="ghost" onClick={onWorktrees} title="Worktree manager">
         ⌗ Worktrees
       </button>

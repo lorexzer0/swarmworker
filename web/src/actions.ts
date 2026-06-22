@@ -1,5 +1,13 @@
 import { api } from './api';
-import type { AgentMeta, Discussion, Project, Settings, WorktreeRow } from './types';
+import type {
+  AgentMeta,
+  DiscoveredRepo,
+  Discussion,
+  Project,
+  ProjectRoot,
+  Settings,
+  WorktreeRow,
+} from './types';
 
 export const spawnAgent = (body: Record<string, unknown>) =>
   api<AgentMeta>('/agents', { method: 'POST', body: JSON.stringify(body) });
@@ -20,6 +28,18 @@ export const removeProject = (id: string) => api(`/projects/${id}`, { method: 'D
 
 export const getBranches = (projectId: string) =>
   api<{ branches: string[]; current: string }>(`/projects/${projectId}/branches`);
+
+export const getBranchesByPath = (repoPath: string) =>
+  api<{ branches: string[]; current: string }>(`/repos/branches?path=${encodeURIComponent(repoPath)}`);
+
+export const listRoots = () => api<{ roots: ProjectRoot[] }>('/roots');
+
+export const addRoot = (path: string) =>
+  api<ProjectRoot>('/roots', { method: 'POST', body: JSON.stringify({ path }) });
+
+export const removeRoot = (id: string) => api(`/roots/${id}`, { method: 'DELETE' });
+
+export const listRepos = () => api<{ repos: DiscoveredRepo[] }>('/repos');
 
 export const patchSettings = (body: Partial<Settings>) =>
   api<Settings>('/settings', { method: 'PATCH', body: JSON.stringify(body) });

@@ -1,12 +1,14 @@
 import { useEffect, useState } from 'react';
 import { useApp } from '../store';
-import { PERMISSION_MODES, type PermissionMode } from '../types';
-import { addProject, getBranches, spawnAgent } from '../actions';
+import { PERMISSION_MODES, type DiscoveredRepo, type PermissionMode } from '../types';
+import { getBranchesByPath, listRepos, spawnAgent } from '../actions';
 import { Modal } from './Modal';
+import { SearchableSelect } from './SearchableSelect';
 
-export function SpawnDialog({ onClose }: { onClose: () => void }) {
-  const { projects, settings, agents } = useApp();
-  const [projectId, setProjectId] = useState(projects[0]?.id || '');
+export function SpawnDialog({ onClose, onManageProjects }: { onClose: () => void; onManageProjects: () => void }) {
+  const { settings, agents } = useApp();
+  const [repos, setRepos] = useState<DiscoveredRepo[] | null>(null);
+  const [repoPath, setRepoPath] = useState('');
   const [branches, setBranches] = useState<string[]>([]);
   const [base, setBase] = useState('');
   const [branch, setBranch] = useState('');
@@ -15,21 +17,25 @@ export function SpawnDialog({ onClose }: { onClose: () => void }) {
   const [name, setName] = useState('');
   const [prompt, setPrompt] = useState('');
   const [inPlace, setInPlace] = useState(false);
-  const [newPath, setNewPath] = useState('');
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    if (!projectId) {
+    listRepos()
+      .then((r) => setRepos(r.repos))
+      .catch((e) => setErr(e.message));
+  }, []);
+
+  // Load the chosen repo's branches by path and pick a sensible default base.
+  useEffect(() => {
+    if (!repoPath) {
       setBranches([]);
       setBase('');
       return;
     }
-    getBranches(projectId)
+    getBranchesByPath(repoPath)
       .then((r) => {
         setBranches(r.branches);
-        // Always reconcile base to a branch that actually exists, so the
-        // selected value can never silently mismatch the rendered option.
         setBase((prev) => {
           if (prev && r.branches.includes(prev)) return prev;
           if (r.current && r.branches.includes(r.current)) return r.current;
@@ -37,29 +43,18 @@ export function SpawnDialog({ onClose }: { onClose: () => void }) {
         });
       })
       .catch(() => setBranches([]));
-  }, [projectId]);
-
-  const onAddProject = async () => {
-    setErr('');
-    try {
-      const p = await addProject(newPath.trim());
-      setNewPath('');
-      setProjectId(p.id);
-    } catch (e: any) {
-      setErr(e.message);
-    }
-  };
+  }, [repoPath]);
 
   const onSpawn = async () => {
-    if (!projectId) {
-      setErr('add and select a project first');
+    if (!repoPath) {
+      setErr('pick a repository first');
       return;
     }
     setBusy(true);
     setErr('');
     try {
       await spawnAgent({
-        projectId,
+        repoPath,
         base,
         branch: branch.trim() || undefined,
         model,
@@ -75,20 +70,22 @@ export function SpawnDialog({ onClose }: { onClose: () => void }) {
     }
   };
 
-  // Warn (don't block) when the selected checkout already has a live in-place
-  // agent — a second one shares the same working files.
-  const project = projects.find((p) => p.id === projectId);
-  const inPlaceLive = inPlace && project
+  const repoOptions =
+    repos?.map((r) => ({
+      value: r.path,
+      label: r.name,
+      sub: r.path,
+      tag: r.registered ? 'used' : undefined,
+    })) ?? [];
+
+  // Warn (don't block) when this checkout already has a live in-place agent.
+  const inPlaceLive = inPlace && repoPath
     ? agents.filter(
-        (a) =>
-          a.inPlace &&
-          (a.status === 'running' || a.status === 'starting') &&
-          a.repoPath === project.path,
+        (a) => a.inPlace && (a.status === 'running' || a.status === 'starting') && a.repoPath === repoPath,
       ).length
     : 0;
 
-  // Non-blocking base-branch validation: only flag a typed base we know isn't a
-  // branch here. If branches couldn't be listed we stay silent (can't tell).
+  // Non-blocking base-branch validation: only flag a base we know isn't here.
   const baseUnknown =
     !inPlace && base.trim() !== '' && branches.length > 0 && !branches.includes(base.trim());
 
@@ -96,32 +93,29 @@ export function SpawnDialog({ onClose }: { onClose: () => void }) {
     <Modal title="New agent" onClose={onClose} wide>
       <div className="form">
         <label>
-          <span>Project</span>
-          <div className="row">
-            <select value={projectId} onChange={(e) => setProjectId(e.target.value)}>
-              {!projects.length && <option value="">— none registered —</option>}
-              {projects.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name} ({p.path})
-                </option>
-              ))}
-            </select>
-          </div>
-        </label>
-
-        <label>
-          <span>Add a project</span>
-          <div className="row">
-            <input
-              placeholder="absolute path to a git repo, e.g. W:\Work\myproject"
-              value={newPath}
-              onChange={(e) => setNewPath(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && newPath.trim() && onAddProject()}
-            />
-            <button onClick={onAddProject} disabled={!newPath.trim()}>
-              + add
+          <span>
+            Repository
+            <button type="button" className="linkish" onClick={onManageProjects}>
+              manage folders…
             </button>
-          </div>
+          </span>
+          {repos && repos.length === 0 ? (
+            <div className="muted small">
+              No repos found. Add a project folder in the{' '}
+              <button type="button" className="linkish" onClick={onManageProjects}>
+                Project manager
+              </button>
+              .
+            </div>
+          ) : (
+            <SearchableSelect
+              options={repoOptions}
+              value={repoPath}
+              onChange={setRepoPath}
+              placeholder={repos ? 'search repos by name or path…' : 'loading repos…'}
+              emptyText="no matching repo"
+            />
+          )}
         </label>
 
         <label className="checkbox-row">
@@ -207,7 +201,7 @@ export function SpawnDialog({ onClose }: { onClose: () => void }) {
           <button className="ghost" onClick={onClose}>
             cancel
           </button>
-          <button className="primary" onClick={onSpawn} disabled={busy || !projectId}>
+          <button className="primary" onClick={onSpawn} disabled={busy || !repoPath}>
             {busy ? 'spawning…' : 'spawn agent'}
           </button>
         </div>

@@ -53,11 +53,12 @@ export class Store {
       if (process.env.SWARM_WORKTREE_ROOT) settings.worktreeRoot = process.env.SWARM_WORKTREE_ROOT;
       return {
         projects: parsed.projects ?? [],
+        roots: parsed.roots ?? [],
         settings,
         agents: parsed.agents ?? [],
       };
     } catch {
-      return { projects: [], settings: defaultSettings(), agents: [] };
+      return { projects: [], roots: [], settings: defaultSettings(), agents: [] };
     }
   }
 

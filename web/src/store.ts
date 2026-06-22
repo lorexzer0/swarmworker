@@ -1,16 +1,17 @@
 // Minimal observable app state. PTY bytes do NOT flow through here (they go
 // straight to xterm); only low-frequency metadata does, so React stays cheap.
 import { useSyncExternalStore } from 'react';
-import type { AgentMeta, Project, Settings, TokenUsage } from './types';
+import type { AgentMeta, Project, ProjectRoot, Settings, TokenUsage } from './types';
 
 export interface AppState {
   projects: Project[];
+  roots: ProjectRoot[];
   agents: AgentMeta[];
   settings: Settings | null;
   connected: boolean;
 }
 
-let state: AppState = { projects: [], agents: [], settings: null, connected: false };
+let state: AppState = { projects: [], roots: [], agents: [], settings: null, connected: false };
 const listeners = new Set<() => void>();
 
 function emit() {
@@ -31,8 +32,13 @@ export function setConnected(connected: boolean) {
   emit();
 }
 
-export function applyServerState(s: { projects: Project[]; agents: AgentMeta[]; settings: Settings }) {
-  state = { ...state, projects: s.projects, agents: s.agents, settings: s.settings };
+export function applyServerState(s: {
+  projects: Project[];
+  roots?: ProjectRoot[];
+  agents: AgentMeta[];
+  settings: Settings;
+}) {
+  state = { ...state, projects: s.projects, roots: s.roots ?? [], agents: s.agents, settings: s.settings };
   emit();
 }
 

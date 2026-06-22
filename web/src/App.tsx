@@ -7,6 +7,7 @@ import { ListView } from './components/ListView';
 import { SpawnDialog } from './components/SpawnDialog';
 import { SettingsDialog } from './components/SettingsDialog';
 import { WorktreesDialog } from './components/WorktreesDialog';
+import { ProjectManager } from './components/ProjectManager';
 import type { GridCols } from './types';
 
 let started = false;
@@ -28,6 +29,7 @@ export function App() {
   const [spawnOpen, setSpawnOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [worktreesOpen, setWorktreesOpen] = useState(false);
+  const [projectsOpen, setProjectsOpen] = useState(false);
   const [focusId, setFocusId] = useState<string | null>(null);
 
   const openAgent = (id: string) => {
@@ -70,6 +72,7 @@ export function App() {
         onNew={() => setSpawnOpen(true)}
         onSettings={() => setSettingsOpen(true)}
         onWorktrees={() => setWorktreesOpen(true)}
+        onProjects={() => setProjectsOpen(true)}
       />
       <main className="main">
         {view === 'grid' ? (
@@ -78,9 +81,18 @@ export function App() {
           <ListView onNew={() => setSpawnOpen(true)} />
         )}
       </main>
-      {spawnOpen && <SpawnDialog onClose={() => setSpawnOpen(false)} />}
+      {spawnOpen && (
+        <SpawnDialog
+          onClose={() => setSpawnOpen(false)}
+          onManageProjects={() => {
+            setSpawnOpen(false);
+            setProjectsOpen(true);
+          }}
+        />
+      )}
       {settingsOpen && <SettingsDialog onClose={() => setSettingsOpen(false)} />}
       {worktreesOpen && <WorktreesDialog onClose={() => setWorktreesOpen(false)} onOpenAgent={openAgent} />}
+      {projectsOpen && <ProjectManager onClose={() => setProjectsOpen(false)} />}
     </div>
   );
 }

@@ -27,6 +27,22 @@ export interface Project {
   addedAt: number;
 }
 
+/** A holding folder scanned for git repos (or a single repo path). */
+export interface ProjectRoot {
+  id: string;
+  path: string;
+  addedAt: number;
+}
+
+/** A git repo discovered under a root (or a standalone registered project). */
+export interface DiscoveredRepo {
+  path: string;
+  name: string;
+  registered: boolean;
+  projectId?: string;
+  rootId?: string;
+}
+
 /** Serializable view of an agent (no live pty/watcher handles). */
 export interface AgentMeta {
   id: string;
@@ -58,6 +74,7 @@ export interface Settings {
 
 export interface PersistedState {
   projects: Project[];
+  roots: ProjectRoot[];
   settings: Settings;
   agents: AgentMeta[];
 }

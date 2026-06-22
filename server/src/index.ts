@@ -17,9 +17,10 @@ import {
   listBranches,
   listProjectWorktrees,
   worktreeDiffStat,
+  scanReposUnder,
 } from './worktrees.js';
 import { countSessions, listSessions } from './tokens.js';
-import type { Project } from './types.js';
+import type { DiscoveredRepo, Project, ProjectRoot } from './types.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.PORT) || 8787;
@@ -35,33 +36,104 @@ app.use(express.json());
 app.get('/api/state', (_req, res) => {
   res.json({
     projects: store.state.projects,
+    roots: store.state.roots,
     agents: manager.list(),
     settings: store.state.settings,
   });
 });
 
+/** Find-or-create a registered Project for a repo path. Idempotent. */
+async function ensureProject(rawPath: string): Promise<Project> {
+  const raw = String(rawPath || '').trim();
+  if (!raw) throw new Error('path required');
+  const normalized = path.normalize(raw);
+  if (!fs.existsSync(normalized)) throw new Error('path does not exist');
+  if (!(await isGitRepo(normalized))) throw new Error('not a git repository');
+  const top = await repoToplevel(normalized);
+  const existing = store.state.projects.find((p) => p.path === top);
+  if (existing) return existing;
+  const project: Project = {
+    id: randomUUID().slice(0, 8),
+    name: path.basename(top),
+    path: top,
+    defaultBranch: await currentBranch(top),
+    addedAt: Date.now(),
+  };
+  store.state.projects.push(project);
+  store.save();
+  broadcastState();
+  return project;
+}
+
 app.post('/api/projects', async (req, res) => {
   try {
-    const raw = String(req.body?.path || '').trim();
-    if (!raw) return res.status(400).json({ error: 'path required' });
-    const normalized = path.normalize(raw);
-    if (!fs.existsSync(normalized)) return res.status(400).json({ error: 'path does not exist' });
-    if (!(await isGitRepo(normalized))) return res.status(400).json({ error: 'not a git repository' });
-    const top = await repoToplevel(normalized);
-    if (store.state.projects.some((p) => p.path === top)) {
-      return res.status(409).json({ error: 'project already registered' });
+    res.json(await ensureProject(String(req.body?.path || '')));
+  } catch (e: any) {
+    res.status(400).json({ error: String(e?.message || e) });
+  }
+});
+
+// ---- project roots (holding folders scanned for repos) ------------------
+
+app.get('/api/roots', (_req, res) => res.json({ roots: store.state.roots }));
+
+app.post('/api/roots', (req, res) => {
+  const raw = String(req.body?.path || '').trim();
+  if (!raw) return res.status(400).json({ error: 'path required' });
+  const normalized = path.normalize(raw);
+  if (!fs.existsSync(normalized) || !fs.statSync(normalized).isDirectory()) {
+    return res.status(400).json({ error: 'folder does not exist' });
+  }
+  if (store.state.roots.some((r) => path.normalize(r.path) === normalized)) {
+    return res.status(409).json({ error: 'folder already added' });
+  }
+  const root: ProjectRoot = { id: randomUUID().slice(0, 8), path: normalized, addedAt: Date.now() };
+  store.state.roots.push(root);
+  store.save();
+  broadcastState();
+  res.json(root);
+});
+
+app.delete('/api/roots/:id', (req, res) => {
+  store.state.roots = store.state.roots.filter((r) => r.id !== req.params.id);
+  store.save();
+  broadcastState();
+  res.json({ ok: true });
+});
+
+// Repos discovered under all roots, merged with standalone registered projects.
+app.get('/api/repos', async (_req, res) => {
+  const byPath = new Map(store.state.projects.map((p) => [path.normalize(p.path), p]));
+  const out = new Map<string, DiscoveredRepo>();
+  for (const root of store.state.roots) {
+    let repos: string[] = [];
+    try {
+      repos = await scanReposUnder(root.path);
+    } catch {
+      /* skip unreadable root */
     }
-    const project: Project = {
-      id: randomUUID().slice(0, 8),
-      name: path.basename(top),
-      path: top,
-      defaultBranch: await currentBranch(top),
-      addedAt: Date.now(),
-    };
-    store.state.projects.push(project);
-    store.save();
-    broadcastState();
-    res.json(project);
+    for (const rp of repos) {
+      const norm = path.normalize(rp);
+      if (out.has(norm)) continue;
+      const proj = byPath.get(norm);
+      out.set(norm, { path: rp, name: path.basename(rp), registered: !!proj, projectId: proj?.id, rootId: root.id });
+    }
+  }
+  for (const p of store.state.projects) {
+    const norm = path.normalize(p.path);
+    if (!out.has(norm)) out.set(norm, { path: p.path, name: p.name, registered: true, projectId: p.id });
+  }
+  const repos = [...out.values()].sort((a, b) => a.name.localeCompare(b.name));
+  res.json({ repos });
+});
+
+// Branches for an arbitrary repo path (used by the spawn picker).
+app.get('/api/repos/branches', async (req, res) => {
+  const p = String(req.query.path || '');
+  if (!p) return res.status(400).json({ error: 'path required' });
+  try {
+    if (!(await isGitRepo(p))) return res.status(400).json({ error: 'not a git repository' });
+    res.json({ branches: await listBranches(p), current: await currentBranch(p) });
   } catch (e: any) {
     res.status(500).json({ error: String(e?.message || e) });
   }
@@ -94,8 +166,13 @@ app.get('/api/projects/:id/branches', async (req, res) => {
 
 app.post('/api/agents', async (req, res) => {
   try {
+    // Accept a registered projectId, or a raw repoPath we find-or-create.
+    let projectId = req.body?.projectId ? String(req.body.projectId) : '';
+    if (!projectId && req.body?.repoPath) {
+      projectId = (await ensureProject(String(req.body.repoPath))).id;
+    }
     const meta = await manager.spawn({
-      projectId: String(req.body?.projectId),
+      projectId,
       base: req.body?.base,
       branch: req.body?.branch,
       model: req.body?.model,
@@ -229,6 +306,7 @@ function broadcastState(): void {
   broadcast({
     t: 'state',
     projects: store.state.projects,
+    roots: store.state.roots,
     agents: manager.list(),
     settings: store.state.settings,
   });
@@ -244,6 +322,7 @@ wss.on('connection', (ws) => {
   send(ws, {
     t: 'state',
     projects: store.state.projects,
+    roots: store.state.roots,
     agents: manager.list(),
     settings: store.state.settings,
   });

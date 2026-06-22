@@ -207,6 +207,31 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--a
 .divider { height: 1px; background: var(--line); margin: 4px 0; }
 .proj-list { display: flex; flex-direction: column; gap: 6px; }
 .proj-row { display: flex; align-items: center; gap: 10px; padding: 6px 8px; background: var(--panel-2); border: 1px solid var(--line); border-radius: 6px; }
+.linkish { background: transparent; border: 0; color: var(--accent-2); cursor: pointer; font: inherit; padding: 0 0 0 8px; text-decoration: underline; }
+.linkish:hover { color: var(--text); }
+
+/* ---- project manager ---- */
+.pm-root-head { display: flex; align-items: center; gap: 10px; margin: 2px 0 6px; }
+
+/* ---- searchable select ---- */
+.ssel { position: relative; }
+.ssel-input { width: 100%; }
+.ssel-list {
+  position: absolute; z-index: 10; left: 0; right: 0; top: calc(100% + 4px);
+  max-height: 320px; overflow: auto; padding: 4px;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 8px;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.45);
+}
+.ssel-empty { padding: 8px; }
+.ssel-opt {
+  display: flex; align-items: center; gap: 8px; width: 100%; text-align: left;
+  background: transparent; color: var(--text); border: 0; border-radius: 6px;
+  padding: 6px 8px; cursor: pointer;
+}
+.ssel-opt.active { background: var(--panel-2); }
+.ssel-opt.sel { outline: 1px solid var(--line); }
+.ssel-opt-label { font-weight: 600; flex: 0 0 auto; }
+.ssel-opt-sub { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: right; direction: rtl; }
 
 /* ---- worktree manager ---- */
 .wt-toolbar { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }

@@ -50,6 +50,42 @@ export async function trustGitDir(dir: string): Promise<boolean> {
   return res.ok;
 }
 
+const SCAN_MAX_DEPTH = 3;
+const SCAN_MAX_REPOS = 2000;
+const SCAN_SKIP = new Set(['node_modules', 'dist', 'build', '.next', 'vendor', '.cache', 'target', 'out']);
+
+/**
+ * Discover git repos under a holding folder. A directory containing `.git` is a
+ * repo (recorded; we don't descend into it); otherwise we recurse up to
+ * SCAN_MAX_DEPTH, skipping hidden/heavy dirs. fs-only — never shells out to git,
+ * so dubious-ownership repos are still discovered. If `root` is itself a repo it
+ * returns just that one.
+ */
+export async function scanReposUnder(root: string, maxDepth = SCAN_MAX_DEPTH): Promise<string[]> {
+  const found: string[] = [];
+  async function walk(dir: string, depth: number): Promise<void> {
+    if (found.length >= SCAN_MAX_REPOS) return;
+    let entries: fs.Dirent[];
+    try {
+      entries = await fs.promises.readdir(dir, { withFileTypes: true });
+    } catch {
+      return; // unreadable (permissions, missing) — skip
+    }
+    if (entries.some((e) => e.name === '.git')) {
+      found.push(path.normalize(dir));
+      return; // it's a repo — don't descend into it
+    }
+    if (depth >= maxDepth) return;
+    for (const e of entries) {
+      if (!e.isDirectory()) continue;
+      if (e.name.startsWith('.') || SCAN_SKIP.has(e.name)) continue;
+      await walk(path.join(dir, e.name), depth + 1);
+    }
+  }
+  await walk(path.normalize(root), 0);
+  return found;
+}
+
 export async function isGitRepo(dir: string): Promise<boolean> {
   let r = await gitTry(dir, ['rev-parse', '--is-inside-work-tree']);
   // A real repo owned by another user aborts with exit 128 ("dubious
