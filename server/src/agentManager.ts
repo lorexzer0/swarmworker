@@ -24,6 +24,10 @@ import type { AgentMeta, PermissionMode, Project } from './types.js';
 
 const RING_LIMIT = 256 * 1024; // bytes of recent PTY output kept for replay
 const SHIFT_TAB = '\x1b[Z'; // cycles permission mode in the Claude TUI
+// ConPTY silently drops input bytes when a single write overflows its buffer,
+// which mangles large pastes. Write big input in paced chunks instead.
+const PTY_INPUT_CHUNK = 1024; // code units per write
+const PTY_INPUT_GAP_MS = 5; // let ConPTY drain between chunks
 
 interface LiveAgent {
   meta: AgentMeta;
@@ -31,6 +35,17 @@ interface LiveAgent {
   watcher?: TranscriptWatcher;
   ring: string[];
   ringBytes: number;
+  inBuf?: string; // input awaiting paced write to the PTY
+  inFlushing?: boolean; // a drain loop is currently active
+}
+
+/** Prefix of up to `max` code units that never splits a surrogate pair. */
+function sliceCodePoints(s: string, max: number): string {
+  if (s.length <= max) return s;
+  let end = max;
+  const c = s.charCodeAt(end - 1);
+  if (c >= 0xd800 && c <= 0xdbff) end -= 1; // trailing high surrogate → next chunk
+  return s.slice(0, end);
 }
 
 export interface SpawnOptions {
@@ -249,7 +264,42 @@ export class AgentManager extends EventEmitter {
   }
 
   input(id: string, data: string): void {
-    this.agents.get(id)?.proc?.write(data);
+    const live = this.agents.get(id);
+    if (!live?.proc || !data) return;
+    // Fast path: small input with nothing queued (normal typing) goes straight
+    // through — no added latency.
+    if (!live.inBuf && data.length <= PTY_INPUT_CHUNK) {
+      live.proc.write(data);
+      return;
+    }
+    // Otherwise queue it and drain in paced chunks. Appending preserves order
+    // even if more input arrives mid-paste.
+    live.inBuf = (live.inBuf ?? '') + data;
+    if (!live.inFlushing) this.flushInput(live);
+  }
+
+  /** Drain a live-agent's input buffer to its PTY in paced chunks. */
+  private flushInput(live: LiveAgent): void {
+    live.inFlushing = true;
+    const step = () => {
+      if (!live.proc) {
+        // Agent exited mid-paste — drop the rest.
+        live.inBuf = '';
+        live.inFlushing = false;
+        return;
+      }
+      const buf = live.inBuf ?? '';
+      if (!buf) {
+        live.inFlushing = false;
+        return;
+      }
+      const chunk = sliceCodePoints(buf, PTY_INPUT_CHUNK);
+      live.inBuf = buf.slice(chunk.length);
+      live.proc.write(chunk);
+      if (live.inBuf) setTimeout(step, PTY_INPUT_GAP_MS);
+      else live.inFlushing = false;
+    };
+    step();
   }
 
   resize(id: string, cols: number, rows: number): void {
