@@ -13,3 +13,8 @@ server/dist/
 
 # local data (also lives in ~/.swarmworker)
 .swarmworker/
+
+# local env overrides (.env.example is committed as a reference)
+.env
+.env.local
+.env.*.local

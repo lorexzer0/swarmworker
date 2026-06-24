@@ -1,8 +1,18 @@
 # swarmworker
 
+[![CI](https://github.com/lorexzer0/swarmworker/actions/workflows/ci.yml/badge.svg)](https://github.com/lorexzer0/swarmworker/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Node](https://img.shields.io/badge/node-%E2%89%A518-3c873a.svg)](.nvmrc)
+[![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
+
 A local control room for a swarm of **Claude Code** agents, each isolated in its
 own **git worktree**, all on your machine, all driven by the real interactive
 `claude` TUI mirrored into the browser.
+
+> ⚠️ **Security:** swarmworker runs `claude` agents that can execute commands on
+> your machine — by default *without* per-action confirmation — and the server
+> has no authentication and binds to all network interfaces. Run it only on
+> trusted machines/networks. Read [SECURITY.md](SECURITY.md) before you start.
 
 - **Two views.** A *list* with per-agent project / branch / model / mode and live
   input/output/cache token counts, and a *security-camera grid* of live terminals.
@@ -89,6 +99,18 @@ Key implementation notes:
 State (registered projects, settings, agent metadata) is persisted to
 `~/.swarmworker/state.json`. Stopped agents can be **resumed** (`--resume`).
 
+### Environment variables
+
+All are optional; see [`.env.example`](.env.example). swarmworker reads them from
+the process environment (it does not auto-load a `.env` file).
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `PORT` | `8787` | HTTP + WebSocket server port. |
+| `SWARM_WORKTREE_ROOT` | `<app-drive>:\swarmworker-worktrees` | Where agent worktrees are created (also editable in Settings). |
+| `SWARM_DATA_DIR` | `~/.swarmworker` | Where state is persisted. |
+| `SWARM_CLAUDE_EXE` | resolved from `PATH` | Explicit path to the `claude` executable. |
+
 ### Named conversations & discussions
 
 - **Auto-named conversations.** When an agent is *opened* (new agent, or a fresh
@@ -113,3 +135,28 @@ web/      React + Vite + xterm.js SPA (list view, camera grid, dialogs)
 that spawns one claude PTY and confirms token tailing. `smoke-rename.ts`
 (`npm -w server run smoke:rename`) confirms the auto-`/rename` lands a
 `custom-title` in the transcript.
+
+## Contributing
+
+Contributions are welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for dev setup,
+the PR workflow, and coding guidelines, and please follow our
+[Code of Conduct](CODE_OF_CONDUCT.md).
+
+Quick start for hacking:
+
+```bash
+git clone https://github.com/lorexzer0/swarmworker.git
+cd swarmworker
+npm install
+npm run dev
+```
+
+## Security
+
+swarmworker executes agent commands on your machine and exposes an
+unauthenticated control API. Please read [SECURITY.md](SECURITY.md) for the
+threat model and how to report vulnerabilities **privately**.
+
+## License
+
+[MIT](LICENSE) © Lorex

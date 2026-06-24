@@ -1,0 +1,62 @@
+name: Bug report
+description: Report something that isn't working as expected
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to file a bug! Please fill out the sections
+        below so we can reproduce and fix it quickly.
+
+        ⚠️ **Do not report security vulnerabilities here** — see
+        [SECURITY.md](../../security/policy) for private reporting.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: A clear description of the bug, including what you expected instead.
+      placeholder: When I spawn an agent on a worktree, ...
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      description: Minimal steps to trigger the bug.
+      placeholder: |
+        1. Run `npm run dev`
+        2. Add project ...
+        3. Spawn agent ...
+        4. See error
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant logs / output
+      description: Server console output, browser console errors, or a screenshot.
+      render: shell
+  - type: input
+    id: os
+    attributes:
+      label: OS
+      placeholder: "Windows 11 / macOS 14 / Ubuntu 24.04"
+    validations:
+      required: true
+  - type: input
+    id: node
+    attributes:
+      label: Node version (`node --version`)
+      placeholder: "v22.18.0"
+    validations:
+      required: true
+  - type: input
+    id: claude
+    attributes:
+      label: Claude CLI version (`claude --version`)
+      placeholder: "x.y.z"
+  - type: input
+    id: commit
+    attributes:
+      label: swarmworker version / commit
+      placeholder: "0.1.0 or git SHA"

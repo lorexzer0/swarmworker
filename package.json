@@ -3,6 +3,31 @@
   "version": "0.1.0",
   "private": true,
   "description": "Local Claude Code agent swarm manager — git worktrees, live TUI mirror, token tracking",
+  "license": "MIT",
+  "author": "Lorex",
+  "homepage": "https://github.com/lorexzer0/swarmworker#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/lorexzer0/swarmworker.git"
+  },
+  "bugs": {
+    "url": "https://github.com/lorexzer0/swarmworker/issues"
+  },
+  "keywords": [
+    "claude",
+    "claude-code",
+    "agents",
+    "agent-swarm",
+    "git-worktree",
+    "pty",
+    "conpty",
+    "xterm",
+    "terminal",
+    "ai"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
   "workspaces": [
     "server",
     "web"
@@ -12,6 +37,7 @@
     "dev:server": "npm -w server run dev",
     "dev:web": "npm -w web run dev",
     "build": "npm -w web run build && npm -w server run build",
+    "typecheck": "npm -w web run typecheck && npm -w server run build",
     "start": "npm -w server run start"
   },
   "devDependencies": {
