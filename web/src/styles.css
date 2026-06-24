@@ -99,6 +99,8 @@ button.ghost {
 }
 .tile.status-running { border-color: #244b2e; }
 .tile.status-exited { opacity: 0.85; }
+/* the focused terminal gets a yellow border so it's clear which is selected */
+.tile:has(.term-wrapper:focus-within) { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
 .tile-head, .tile-foot {
   display: flex; align-items: center; gap: 8px; padding: 6px 8px; background: var(--panel-2);
 }
@@ -276,3 +278,38 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--a
 .empty { height: 100%; display: grid; place-content: center; justify-items: center; gap: 8px; color: var(--muted); text-align: center; }
 .empty-mark { font-size: 48px; color: var(--accent); }
 .empty h2 { margin: 0; color: var(--text); }
+
+/* ---- responsive / mobile ---- */
+@media (max-width: 768px) {
+  .topbar { flex-wrap: wrap; gap: 8px; padding: 8px 10px; }
+  .topbar > .spacer { display: none; }
+  .hide-mobile { display: none !important; }
+
+  /* stack two-column form rows */
+  .grid2 { grid-template-columns: 1fr; }
+
+  /* heads with many inline items wrap instead of overflowing */
+  .viewer-head, .dock-head, .tile-head, .tile-foot, .wt-row, .pm-root-head { flex-wrap: wrap; }
+
+  /* near-fullscreen dialogs */
+  .modal, .modal.wide { width: 96vw; }
+  .viewer { width: 100vw; height: 100vh; border-radius: 0; }
+
+  /* roomier tap targets */
+  .seg button, button.ghost, button.primary, .act, .wt-toolbar button { padding-top: 8px; padding-bottom: 8px; }
+
+  /* 16px inputs stop iOS from auto-zooming on focus */
+  input, select, textarea { font-size: 16px; }
+
+  table.agents th, table.agents td { padding: 6px 8px; }
+}
+
+@media (max-width: 560px) {
+  /* one agent per row on phones, regardless of the chosen column count */
+  .grid { grid-template-columns: 1fr !important; grid-auto-rows: minmax(220px, 1fr); }
+  .hide-narrow { display: none !important; }
+  .tile-wt { display: none; }
+  .brand { font-size: 13px; }
+  .profile-pick { max-width: 130px; }
+  .table-wrap { max-height: 38%; }
+}

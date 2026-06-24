@@ -42,7 +42,7 @@ export function TopBar({
         </button>
       </div>
       {view === 'grid' && (
-        <div className="seg" title="Grid columns (auto = fit to width)">
+        <div className="seg hide-narrow" title="Grid columns (auto = fit to width)">
           {GRID_COLS.map((c) => (
             <button
               key={c}
@@ -55,15 +55,15 @@ export function TopBar({
           ))}
         </div>
       )}
-      <span className="stat">
+      <span className="stat hide-mobile">
         <b>{live}</b>/{agents.length} live
       </span>
-      <span className="stat" title="total tokens across all agents">
+      <span className="stat hide-mobile" title="total tokens across all agents">
         Σ ↑{fmtTokens(totIn)} ↓{fmtTokens(totOut)}
       </span>
       <span className="spacer" />
       {settings && (
-        <span className="muted small">
+        <span className="muted small hide-mobile">
           default {settings.defaultModel} · {settings.defaultMode}
         </span>
       )}

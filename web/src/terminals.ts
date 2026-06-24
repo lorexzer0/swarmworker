@@ -6,6 +6,33 @@ import { FitAddon } from '@xterm/addon-fit';
 import { WebLinksAddon } from '@xterm/addon-web-links';
 import { wsSend } from './ws';
 
+/** Copy text to the clipboard, full and intact. Prefers the async Clipboard
+ *  API (secure contexts / localhost) and falls back to execCommand so it also
+ *  works over plain-HTTP on a LAN IP. */
+function writeClipboard(text: string): void {
+  if (navigator.clipboard?.writeText) {
+    navigator.clipboard.writeText(text).catch(() => execCommandCopy(text));
+  } else {
+    execCommandCopy(text);
+  }
+}
+function execCommandCopy(text: string): void {
+  try {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.top = '0';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.focus();
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+  } catch {
+    /* ignore */
+  }
+}
+
 interface Entry {
   term: Terminal;
   fit: FitAddon;
@@ -40,6 +67,33 @@ class TerminalManager {
     wrapper.className = 'term-wrapper';
     term.open(wrapper);
     term.onData((d) => wsSend({ t: 'input', agentId, data: d }));
+
+    // Ctrl+C copies the selection (then clears it) instead of sending SIGINT;
+    // with nothing selected it falls through as a normal interrupt. We
+    // preventDefault so the browser's own copy (which grabs only xterm's
+    // partial a11y buffer) can't race and clobber our full-selection copy.
+    term.attachCustomKeyEventHandler((ev) => {
+      if (ev.type === 'keydown' && ev.ctrlKey && !ev.altKey && !ev.metaKey && (ev.key === 'c' || ev.key === 'C')) {
+        if (term.hasSelection()) {
+          ev.preventDefault();
+          writeClipboard(term.getSelection());
+          term.clearSelection();
+          return false; // handled — don't forward ^C to the PTY
+        }
+      }
+      return true;
+    });
+
+    // Right-click pastes the clipboard into the terminal.
+    wrapper.addEventListener('contextmenu', (ev) => {
+      ev.preventDefault();
+      navigator.clipboard
+        ?.readText()
+        .then((text) => {
+          if (text) term.paste(text);
+        })
+        .catch(() => {});
+    });
 
     const e: Entry = { term, fit, wrapper, lastCols: 0, lastRows: 0 };
     this.map.set(agentId, e);
