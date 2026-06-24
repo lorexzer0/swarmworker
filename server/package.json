@@ -8,6 +8,8 @@
     "dev": "tsx watch src/index.ts",
     "build": "tsc -p tsconfig.json",
     "start": "node dist/index.js",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "smoke": "tsx src/smoke.ts",
     "smoke:rename": "tsx src/smoke-rename.ts"
   },

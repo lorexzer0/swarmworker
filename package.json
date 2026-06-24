@@ -38,9 +38,11 @@
     "dev:web": "npm -w web run dev",
     "build": "npm -w web run build && npm -w server run build",
     "typecheck": "npm -w web run typecheck && npm -w server run build",
+    "test": "npm run test --workspaces --if-present",
     "start": "npm -w server run start"
   },
   "devDependencies": {
-    "concurrently": "^9.1.0"
+    "concurrently": "^9.1.0",
+    "vitest": "^3.0.0"
   }
 }

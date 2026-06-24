@@ -53,11 +53,16 @@ npm start            # -> http://localhost:8787
 1. **Fork** the repo and create a branch off `main`:
    `git checkout -b feat/short-description`
 2. Make your change. Keep it focused — one logical change per PR.
-3. **Type-check / build** before pushing:
+3. **Type-check, test, and build** before pushing — this is exactly what CI runs:
    ```bash
    npm run typecheck   # web tsc --noEmit + server tsc
+   npm test            # vitest unit tests (server + web)
    npm run build       # full production build
    ```
+   Add or update unit tests for any logic you change. Tests live next to the
+   code as `*.test.ts` and run in Node via [Vitest](https://vitest.dev). Run a
+   single workspace's tests in watch mode with `npm -w server run test:watch`
+   (or `-w web`).
 4. If you touched the PTY/transcript plumbing, run the smoke checks (require a
    logged-in `claude` CLI):
    ```bash

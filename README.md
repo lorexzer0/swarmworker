@@ -131,10 +131,24 @@ server/   Node + TypeScript backend (PTY supervisor, git, transcript tailing, WS
 web/      React + Vite + xterm.js SPA (list view, camera grid, dialogs)
 ```
 
-`server/src/smoke.ts` is a standalone integration check (`npm -w server run smoke`)
-that spawns one claude PTY and confirms token tailing. `smoke-rename.ts`
-(`npm -w server run smoke:rename`) confirms the auto-`/rename` lands a
-`custom-title` in the transcript.
+### Tests
+
+Unit tests (Vitest) cover the pure logic — branch-name generation, Claude
+project-dir encoding / env sanitizing / trust-config writing, and the transcript
+token-accumulation watcher. Run the whole suite (server + web) with:
+
+```bash
+npm test
+```
+
+Tests live next to the code as `*.test.ts`. They run in Node with no external
+processes, so they're safe in CI (where they run on every push/PR).
+
+In addition, `server/src/smoke.ts` is a standalone integration check
+(`npm -w server run smoke`) that spawns one claude PTY and confirms token
+tailing. `smoke-rename.ts` (`npm -w server run smoke:rename`) confirms the
+auto-`/rename` lands a `custom-title` in the transcript. The smoke checks need a
+logged-in `claude` CLI and are not part of CI.
 
 ## Contributing
 

@@ -107,7 +107,7 @@ export function GitProfilesManager({ onClose }: { onClose: () => void }) {
           <input
             value={draft.label}
             onChange={(e) => setDraft({ ...draft, label: e.target.value })}
-            placeholder="e.g. Work (Adroit) — defaults to the name"
+            placeholder="e.g. Work — defaults to the name"
           />
         </label>
         <div className="grid2">
